@@ -43,6 +43,7 @@ import com.ai.phoneagent.net.AutoGlmClient
 import com.ai.phoneagent.net.LocalMnnInferenceEngine
 import com.ai.phoneagent.net.ModelScopeModelDownloader
 import com.ai.phoneagent.core.templates.PromptTemplates
+import com.ai.phoneagent.speech.SherpaModelRepository
 import com.ai.phoneagent.speech.SherpaSpeechRecognizer
 import java.lang.ref.WeakReference
 import java.text.SimpleDateFormat
@@ -1084,6 +1085,11 @@ class AutomationViewModel(
 
     private fun initSherpaModel() {
         if (sherpaInitializing) return
+        // 模型已移出 APK：未下载时静默跳过（由设置页引导下载），不再弹「初始化失败」。
+        if (SherpaModelRepository.isModelMissing(appContext)) {
+            Log.i("AutomationViewModel", "离线语音模型未下载，跳过语音初始化")
+            return
+        }
         sherpaInitializing = true
         viewModelScope.launch {
             try {
@@ -1095,8 +1101,17 @@ class AutomationViewModel(
                     }
                 sherpaSpeechRecognizer = if (success) recognizer else null
                 if (!success) {
+                    val reasonRes =
+                            recognizer.lastFailureMessageRes()
+                                    ?: com.ai.phoneagent.R.string
+                                            .speech_model_failure_recognizer_create_failed
+                    val message =
+                            appContext.getString(
+                                    com.ai.phoneagent.R.string.speech_model_init_failed,
+                                    appContext.getString(reasonRes)
+                            )
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(appContext, "语音模型初始化失败，请重试", Toast.LENGTH_LONG).show()
+                        Toast.makeText(appContext, message, Toast.LENGTH_LONG).show()
                     }
                 }
             } catch (e: Exception) {
@@ -1136,7 +1151,11 @@ class AutomationViewModel(
     fun startLocalVoiceInput() {
         val recognizer = sherpaSpeechRecognizer
         if (recognizer == null) {
-            Toast.makeText(appContext, "语音模型未初始化，请稍候重试", Toast.LENGTH_SHORT).show()
+            val message =
+                    if (SherpaModelRepository.isModelMissing(appContext))
+                            appContext.getString(com.ai.phoneagent.R.string.speech_model_not_downloaded_hint)
+                    else "语音模型未初始化，请稍候重试"
+            Toast.makeText(appContext, message, Toast.LENGTH_SHORT).show()
             initSherpaModel()
             return
         }

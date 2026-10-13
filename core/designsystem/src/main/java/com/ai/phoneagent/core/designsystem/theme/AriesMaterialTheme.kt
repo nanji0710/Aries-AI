@@ -25,6 +25,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -156,12 +157,20 @@ fun AriesMaterialTheme(
             labelSmall = baseTypography.labelSmall.scaledBy(fontScale).withFontFamily(fontFamily),
         )
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        shapes = shapes,
-        typography = typography,
-        content = content,
-    )
+    // 把「主题感知的资源上下文」与「当前应用是否为深色」下发给整棵子树：
+    // 否则所有 colorResource / values-night 资源会按**系统**深浅色解析，与 colorScheme 脱节
+    // （浅色模式下取到深色令牌看起来发黑，深色模式下取到浅色令牌看起来发白）。
+    CompositionLocalProvider(
+        LocalAriesThemeContext provides themeResourceContext,
+        LocalAriesIsDarkTheme provides darkTheme,
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            shapes = shapes,
+            typography = typography,
+            content = content,
+        )
+    }
 }
 
 private fun TextStyle.scaledBy(factor: Float): TextStyle =

@@ -629,7 +629,9 @@ class ToolRegistration(
                             error = "需要至少一个选择器参数: resource_id, text, content_desc, 或 class_name"
                         )
                     } else {
-                        kotlinx.coroutines.runBlocking {
+                        // 用 runBlocking(Dispatchers.IO) 而不是裸 runBlocking：裸 runBlocking 会把续体
+                        // 排在调用线程的事件循环上，一旦从主线程调用就是自锁死锁（见 2026-10-10 ANR）。
+                        kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
                             val success = service.scrollToElement(
                                 resourceId = resourceId,
                                 text = text,

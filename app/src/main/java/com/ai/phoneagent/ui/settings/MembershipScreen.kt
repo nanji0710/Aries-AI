@@ -1,6 +1,5 @@
 package com.ai.phoneagent.ui.settings
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,10 +16,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import com.ai.phoneagent.core.designsystem.theme.rememberAriesGlassCardShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,11 +37,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ai.phoneagent.R
+import com.ai.phoneagent.core.designsystem.R as DesignR
+import com.ai.phoneagent.core.designsystem.theme.AriesGlassPanel
+import com.ai.phoneagent.core.designsystem.theme.ariesColorResource
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Crown
 import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.Zap
+import androidx.compose.ui.graphics.Color
 
 private enum class MembershipTier {
     Basic,
@@ -98,7 +100,7 @@ fun MembershipScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(text = stringResource(R.string.membership_title)) },
@@ -111,7 +113,7 @@ fun MembershipScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = ariesColorResource(DesignR.color.m3t_glass_bar),
                 ),
                 modifier = Modifier.statusBarsPadding(),
             )
@@ -186,27 +188,23 @@ private fun TierCard(
     val spacingMd = dimensionResource(R.dimen.m3t_spacing_md)
     val spacingLg = dimensionResource(R.dimen.m3t_spacing_lg)
 
+    // 会员卡承载价格与权益文字：原来的 0.3f 容器在画布上几乎透明，文字会与背景互相干扰。
     val containerColor = when (tier) {
-        MembershipTier.Pro -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        MembershipTier.Ultimate -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
-        else -> MaterialTheme.colorScheme.surface
+        MembershipTier.Pro -> MaterialTheme.colorScheme.primaryContainer
+        MembershipTier.Ultimate -> MaterialTheme.colorScheme.tertiaryContainer
+        else -> MaterialTheme.colorScheme.surfaceContainerHigh
     }
 
-    val borderStroke = if (isRecommended) {
-        BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-    } else {
-        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    }
-
-    Card(
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        shape = MaterialTheme.shapes.extraLarge,
-        border = borderStroke,
+    AriesGlassPanel(
+        modifier = Modifier.fillMaxWidth(),
+        shape = rememberAriesGlassCardShape(),
+        tint = containerColor,
+        elevated = true,
+        borderColor = if (isRecommended) MaterialTheme.colorScheme.primary else Color.Unspecified,
+        contentPadding = PaddingValues(spacingLg),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(spacingLg),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(spacingSm),
         ) {
             Row(
@@ -306,14 +304,14 @@ private fun FeatureComparisonTable(features: List<FeatureRow>) {
     val spacingMd = dimensionResource(R.dimen.m3t_spacing_md)
     val spacingLg = dimensionResource(R.dimen.m3t_spacing_lg)
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = MaterialTheme.shapes.extraLarge,
+    AriesGlassPanel(
+        modifier = Modifier.fillMaxWidth(),
+        shape = rememberAriesGlassCardShape(),
+        elevated = true,
+        contentPadding = PaddingValues(spacingLg),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(spacingLg),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(spacingMd),
         ) {
             Text(
@@ -368,9 +366,9 @@ private fun FeatureValueCell(
     val spacingSm = dimensionResource(R.dimen.m3t_spacing_sm)
 
     val containerColor = if (highlight) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        MaterialTheme.colorScheme.primaryContainer
     } else {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        MaterialTheme.colorScheme.surfaceVariant
     }
 
     Surface(

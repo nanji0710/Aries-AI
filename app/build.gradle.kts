@@ -1,5 +1,4 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -45,6 +44,10 @@ fun localProperty(name: String, defaultValue: String): String =
 fun escapedBuildConfigString(value: String): String =
     value.replace("\\", "\\\\").replace("\"", "\\\"")
 
+// release 签名默认值（随仓库提供 aries-release.jks）；生产发布建议改用 local.properties 覆盖。
+val RELEASE_STORE_PASSWORD = "Aries@2026Release"
+val RELEASE_KEY_ALIAS = "aries"
+
 android {
     namespace = "com.ai.phoneagent"
     compileSdk = 36
@@ -84,6 +87,24 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            // 密钥库默认放在仓库根目录；也可在 local.properties 用
+            // aries.release.storeFile / storePassword / keyAlias / keyPassword 覆盖。
+            val configuredPath = localProperty("aries.release.storeFile")
+            val storeFileResolved =
+                if (configuredPath.isNotBlank()) rootProject.file(configuredPath)
+                else rootProject.file("aries-release.jks")
+
+            if (storeFileResolved.exists()) {
+                storeFile = storeFileResolved
+                storePassword = localProperty("aries.release.storePassword", RELEASE_STORE_PASSWORD)
+                keyAlias = localProperty("aries.release.keyAlias", RELEASE_KEY_ALIAS)
+                keyPassword = localProperty("aries.release.keyPassword", RELEASE_STORE_PASSWORD)
+            }
+        }
+    }
+
     buildTypes {
         debug {
             val escapedToken = escapedBuildConfigString(githubToken)
@@ -91,12 +112,21 @@ android {
         }
 
         release {
-            isMinifyEnabled = false
+            // 开启代码与资源压缩：未裁剪的 dex 约 81 MB，R8 后约 6.4 MB。
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
+    }
+
+    androidResources {
+        // APK 内 85 种语言全部来自依赖库（App 自身没有 values-<lang>），
+        // 只保留中英文可将 resources.arsc 从 1.6 MB 降到约 0.75 MB。
+        localeFilters += listOf("zh", "en", "zh-rTW", "zh-rHK")
     }
 
     lint {
@@ -125,9 +155,17 @@ android {
         jniLibs {
             useLegacyPackaging = true
         }
+        dex {
+            // AGP 8.3+ 默认把 dex 以 stored（不压缩）方式放进 APK，31 个 dex 共 81.6 MB；
+            // 改回压缩后同一批 dex 只需约 26.6 MB（实测比值 32.5%），
+            // 代价是安装时多一次解压（dex 无论哪种方式都会落到 /data/dalvik-cache）。
+            useLegacyPackaging = true
+        }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+            // iText 的连字符排版字典（0.95 MB）项目未使用，直接排除。
+            excludes += "com/itextpdf/hyph/**"
             pickFirsts += "META-INF/INDEX.LIST"
             pickFirsts += "META-INF/io.netty.versions.properties"
         }

@@ -54,6 +54,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
@@ -62,8 +63,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.Dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.lifecycleScope
 import com.ai.phoneagent.core.designsystem.theme.AriesMaterialTheme
+import com.ai.phoneagent.core.designsystem.theme.rememberAriesGlassColors
 import com.ai.phoneagent.data.preferences.AppPreferencesRepository
+import kotlinx.coroutines.launch
 
 class MainOnboardingOverlay(
     private val activity: AppCompatActivity,
@@ -114,7 +118,9 @@ class MainOnboardingOverlay(
                         when (currentStep) {
                             Step.WELCOME -> currentStep = Step.AGREEMENT
                             Step.AGREEMENT -> {
-                                appPrefs.setUserAgreementAcceptedBlocking(true)
+                                activity.lifecycleScope.launch {
+                                    appPrefs.setUserAgreementAccepted(true)
+                                }
                                 markPermissionGuideShown()
                                 refreshPermissionUi()
                                 currentStep = Step.PERMISSION
@@ -139,10 +145,14 @@ class MainOnboardingOverlay(
     }
 
     fun showPermissionOnlyIfNeeded() {
-        if (!appPrefs.getUserAgreementAcceptedBlocking()) return
-        if (appPrefs.getPermGuideShownBlocking()) return
-        flowMode = FlowMode.PERMISSION_ONLY
-        showOverlay(Step.PERMISSION)
+        // 原实现用 *Blocking() 在调用线程（onResume → 主线程）上同步读 DataStore，
+        // 是冷启动/回前台卡顿的来源之一；这里改为协程读取。
+        activity.lifecycleScope.launch {
+            if (!appPrefs.getUserAgreementAccepted()) return@launch
+            if (appPrefs.getPermGuideShown()) return@launch
+            flowMode = FlowMode.PERMISSION_ONLY
+            showOverlay(Step.PERMISSION)
+        }
     }
 
     fun onResume() {
@@ -178,7 +188,7 @@ class MainOnboardingOverlay(
     }
 
     private fun markPermissionGuideShown() {
-        appPrefs.setPermGuideShownBlocking(true)
+        activity.lifecycleScope.launch { appPrefs.setPermGuideShown(true) }
     }
 
     private fun refreshPermissionUi() {
@@ -223,10 +233,12 @@ class MainOnboardingOverlay(
     }
 
     private fun applyOverlaySystemBars() {
-        val pageColor = ContextCompat.getColor(activity, R.color.m3t_drawer_background)
         val useLightSystemBarIcons = activity.resources.getBoolean(R.bool.m3t_light_system_bars)
-        activity.window.statusBarColor = pageColor
-        activity.window.navigationBarColor = pageColor
+        // 引导页同样运行在 edge-to-edge 上（MainActivity.setupEdgeToEdge 关闭了 decorFitsSystemWindows）。
+        // 之前把系统栏刷成不透明的 m3t_drawer_background，会与全局玻璃画布冲突，
+        // 而且在 targetSdk 36 / Android 15+ 上该字段已被系统忽略 —— 保持透明。
+        activity.window.statusBarColor = android.graphics.Color.TRANSPARENT
+        activity.window.navigationBarColor = android.graphics.Color.TRANSPARENT
         WindowCompat.getInsetsController(activity.window, activity.window.decorView)?.let {
             it.isAppearanceLightStatusBars = useLightSystemBarIcons
             it.isAppearanceLightNavigationBars = useLightSystemBarIcons
@@ -295,8 +307,10 @@ private fun MainOnboardingOverlayScreen(
             label = "onboardingProgress",
         )
 
+    // 引导流程同样跑在 MainActivity 的全局玻璃画布上：整屏铺不透明底色会把画布盖死，
+    // 只有承载长文的卡片才需要高不透明底保证可读性。
     Column(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+        modifier = Modifier.fillMaxSize().background(Color.Transparent),
     ) {
         Box(
             modifier = Modifier.fillMaxWidth().weight(1f),
@@ -371,10 +385,12 @@ private fun WelcomePanel(
     val spacingLg = dimensionResource(R.dimen.m3t_spacing_lg)
     val spacingXl = dimensionResource(R.dimen.m3t_spacing_xl)
     val buttonHeight = dimensionResource(R.dimen.m3t_button_height)
+    // 卡片承载正文，必须用高不透明玻璃底（浅色 94.9% / 深色 94.1%），否则画布与文字互相干扰。
+    val glassColors = rememberAriesGlassColors()
 
     Card(
         modifier = modifier.padding(horizontal = spacingXl, vertical = spacingLg),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = glassColors.surfaceStrong),
         shape = MaterialTheme.shapes.extraLarge,
     ) {
         Column(
@@ -415,10 +431,12 @@ private fun AgreementPanel(
     val buttonHeight = dimensionResource(R.dimen.m3t_button_height)
     val agreementTextColor = MaterialTheme.colorScheme.onSurface.toArgb()
     val agreementContainerColor = MaterialTheme.colorScheme.surfaceVariant.toArgb()
+    // 协议正文卡片：同样用高不透明玻璃底（正文本身在 AndroidView 里仍是实色，保证可读性）。
+    val glassColors = rememberAriesGlassColors()
 
     Card(
         modifier = modifier.padding(horizontal = spacingXl, vertical = spacingLg),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = glassColors.surfaceStrong),
         shape = MaterialTheme.shapes.extraLarge,
     ) {
         Column(
@@ -496,10 +514,11 @@ private fun PermissionPanel(
     val spacingXl = dimensionResource(R.dimen.m3t_spacing_xl)
     val buttonHeight = dimensionResource(R.dimen.m3t_button_height)
     val compactButtonHeight = dimensionResource(R.dimen.m3t_compact_button_height)
+    val glassColors = rememberAriesGlassColors()
 
     Card(
         modifier = modifier.padding(horizontal = spacingXl, vertical = spacingLg),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = glassColors.surfaceStrong),
         shape = MaterialTheme.shapes.extraLarge,
     ) {
         LazyColumn(

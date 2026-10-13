@@ -75,17 +75,12 @@
             android:resizeableActivity="true"
             android:theme="@style/Theme.PhoneAgent" />
 
-        <!-- 悬浮聊天窗口服务 -->
-        <service
-            android:name=".FloatingChatService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-        </service>
-
+        <!-- uiMode 必须自行处理：应用内切换深浅色时走 onConfigurationChanged + Compose 重组，
+             不重建 Activity（避免切换瞬间黑屏/闪烁），同时保证资源颜色按新主题重新解析。 -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:configChanges="orientation|screenLayout|screenSize|smallestScreenSize|keyboardHidden"
+            android:configChanges="orientation|screenLayout|screenSize|smallestScreenSize|keyboardHidden|uiMode"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

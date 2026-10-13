@@ -20,7 +20,6 @@ package com.ai.phoneagent
 import android.app.Application
 import android.content.Context
 import android.os.Build
-import androidx.appcompat.app.AppCompatDelegate
 import coil.Coil
 import coil.ImageLoader
 import com.ai.phoneagent.telemetry.TelemetryHeartbeatManager
@@ -29,6 +28,8 @@ import com.ai.phoneagent.di.appModule
 import com.ai.phoneagent.di.dataModule
 import com.ai.phoneagent.di.networkModule
 import com.ai.phoneagent.di.uiModule
+import com.ai.phoneagent.system.AriesCrashReporter
+import com.ai.phoneagent.system.AriesThemeNightModeSync
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
@@ -67,8 +68,16 @@ class AriesAgentApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // 跟随系统自动切换日夜模式
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+        // 崩溃落盘（仅 debug 构建）：本机测试 ROM 屏蔽 logcat，Java 崩溃栈只能应用内留档，
+        // 下次启动由 MainActivity 回显。必须放在最早期，才能抓到 Koin/初始化阶段的崩溃。
+        if (BuildConfig.DEBUG) {
+            AriesCrashReporter.install(this)
+        }
+
+        // 日夜模式：跟随应用内偏好（镜像存于 SharedPreferences，冷启动同步可读），
+        // 而不是永远跟随系统 —— 否则 colorResource / values-night 资源会与
+        // MaterialTheme.colorScheme 脱节（浅色模式取到深色令牌、深色模式取到浅色令牌）。
+        AriesThemeNightModeSync.applyFromMirror(this)
 
         // 初始化全局上下文
         AppState.init(this)

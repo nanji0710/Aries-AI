@@ -31,6 +31,7 @@ import androidx.core.content.ContextCompat
 import com.ai.phoneagent.core.utils.DisplayUtils
 import com.ai.phoneagent.vdiso.ShizukuVirtualDisplayEngine
 import java.util.concurrent.atomic.AtomicInteger
+import com.ai.phoneagent.system.AriesThemeNightModeSync
 
 /**
  * 虚拟屏预览悬浮窗 — 让用户实时观看虚拟屏执行过程
@@ -422,7 +423,7 @@ class VirtualScreenPreviewOverlay(
                         )
                         .toInt()
 
-        private fun m3Color(@ColorRes colorRes: Int): Int = ContextCompat.getColor(context, colorRes)
+        private fun m3Color(@ColorRes colorRes: Int): Int = AriesThemeNightModeSync.resolveColor(context, colorRes)
     }
 
     // ═══════════════════════════════════════════════════════
@@ -546,7 +547,7 @@ class VirtualScreenPreviewOverlay(
                         )
                         .toInt()
 
-        private fun m3Color(@ColorRes colorRes: Int): Int = ContextCompat.getColor(context, colorRes)
+        private fun m3Color(@ColorRes colorRes: Int): Int = AriesThemeNightModeSync.resolveColor(context, colorRes)
     }
 
     // ═══════════════════════════════════════════════════════
@@ -916,7 +917,7 @@ class VirtualScreenPreviewOverlay(
                         )
                         .toInt()
 
-        private fun m3Color(@ColorRes colorRes: Int): Int = ContextCompat.getColor(context, colorRes)
+        private fun m3Color(@ColorRes colorRes: Int): Int = AriesThemeNightModeSync.resolveColor(context, colorRes)
     }
 
     companion object {

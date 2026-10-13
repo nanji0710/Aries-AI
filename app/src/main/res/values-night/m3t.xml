@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- M3T Dark Palette -->
-    <color name="m3t_primary">#A9C7FF</color>
+    <!-- M3T Dark Palette — cobalt blue on deep slate glass -->
+    <color name="m3t_primary">#5AA9FF</color>
     <color name="m3t_on_primary">#003061</color>
     <color name="m3t_primary_container">#134782</color>
     <color name="m3t_on_primary_container">#D7E3FF</color>
 
-    <color name="m3t_secondary">#B2C8E8</color>
+    <color name="m3t_secondary">#98C6F2</color>
     <color name="m3t_on_secondary">#1D314A</color>
     <color name="m3t_secondary_container">#334863</color>
     <color name="m3t_on_secondary_container">#D2E4FF</color>
@@ -20,16 +20,16 @@
     <color name="m3t_error_container">#93000A</color>
     <color name="m3t_on_error_container">#FFDAD6</color>
 
-    <color name="m3t_background">#0F141B</color>
-    <color name="m3t_on_background">#E1E7F1</color>
-    <color name="m3t_surface">#121A24</color>
-    <color name="m3t_on_surface">#E1E7F1</color>
-    <color name="m3t_surface_container">#18222E</color>
-    <color name="m3t_surface_container_high">#1F2A37</color>
-    <color name="m3t_surface_variant">#414754</color>
-    <color name="m3t_on_surface_variant">#C1C7D3</color>
-    <color name="m3t_outline">#8B92A0</color>
-    <color name="m3t_outline_variant">#434A56</color>
+    <color name="m3t_background">#111821</color>
+    <color name="m3t_on_background">#F5F7FA</color>
+    <color name="m3t_surface">#1B2633</color>
+    <color name="m3t_on_surface">#F5F7FA</color>
+    <color name="m3t_surface_container">#202D3A</color>
+    <color name="m3t_surface_container_high">#29394A</color>
+    <color name="m3t_surface_variant">#2B3A4A</color>
+    <color name="m3t_on_surface_variant">#ADB7C5</color>
+    <color name="m3t_outline">#8493A6</color>
+    <color name="m3t_outline_variant">#405064</color>
 
     <color name="m3t_inverse_surface">#E1E7F1</color>
     <color name="m3t_inverse_on_surface">#2A3139</color>
@@ -41,8 +41,8 @@
     <color name="m3t_thinking_text">#F1F6FF</color>
     <color name="m3t_thinking_stroke">#8FB3E4</color>
 
-    <color name="m3t_message_ai_bg">#223247</color>
-    <color name="m3t_message_user_bg">#234067</color>
+    <color name="m3t_message_ai_bg">#1D2B3A</color>
+    <color name="m3t_message_user_bg">#203B5A</color>
     <color name="m3t_message_ai_border">#49627E</color>
     <color name="m3t_message_user_border">#5B81B2</color>
     <color name="m3t_message_meta_bg">#27384B</color>
@@ -50,10 +50,14 @@
     <color name="m3t_message_action">#F0F5FF</color>
     <color name="m3t_message_action_stroke">#66FFFFFF</color>
 
-    <color name="m3t_drawer_background">#152231</color>
-    <color name="m3t_drawer_section_bg">#1A2A3C</color>
-    <color name="m3t_drawer_input_bg">#213247</color>
+    <color name="m3t_drawer_background">#172231</color>
+    <color name="m3t_drawer_section_bg">#1B2633</color>
+    <color name="m3t_drawer_input_bg">#223348</color>
+    <color name="m3t_drawer_footer_bg">#1D2B3B</color>
+    <color name="m3t_drawer_active_item_bg">#234067</color>
+    <color name="m3t_drawer_scrim">#B30E1621</color>
     <color name="m3t_floating_header">#1F2C3B</color>
+    <color name="m3t_on_floating_header">#EAF1FA</color>
     <color name="m3t_floating_surface">#141D27</color>
     <color name="m3t_floating_text_secondary">#9FAEC4</color>
     <color name="m3t_recommend_grad_start">#264A6CA0</color>
@@ -61,10 +65,11 @@
     <color name="m3t_dialog_surface">#1A2D45</color>
     <color name="m3t_dialog_surface_alt">#1D3A2E</color>
     <color name="m3t_button_white">#2B3F56</color>
-    <color name="m3t_about_page_bg">#101A26</color>
-    <color name="m3t_automation_page_bg">#111C28</color>
-    <color name="m3t_about_card_bg">#223243</color>
-    <color name="m3t_automation_card_bg">#1E2C3B</color>
+    <color name="m3t_button_light_blue">#2B4E7A</color>
+    <color name="m3t_about_page_bg">#111821</color>
+    <color name="m3t_automation_page_bg">#111821</color>
+    <color name="m3t_about_card_bg">#1D2835</color>
+    <color name="m3t_automation_card_bg">#1D2835</color>
     <color name="m3t_virtual_welcome_bg">#FF000000</color>
     <color name="m3t_virtual_welcome_text">#FFE1E7F1</color>
     <color name="m3t_automation_progress_bg">#1D3A23</color>
@@ -110,4 +115,6 @@
     <color name="m3t_card_border_grad_end">#333E6796</color>
     <color name="m3t_circle_glass_bg">#339BCBFF</color>
 
+    <dimen name="m3t_drawer_width">296dp</dimen>
+    <dimen name="m3t_drawer_max_width">420dp</dimen>
 </resources>

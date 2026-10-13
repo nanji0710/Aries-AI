@@ -2,20 +2,26 @@ package com.ai.phoneagent.ui.home
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
@@ -35,12 +41,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.dimensionResource
 import com.ai.phoneagent.R
+import com.ai.phoneagent.core.designsystem.R as DesignR
+import com.ai.phoneagent.core.designsystem.theme.AriesGlassCanvas
+import com.ai.phoneagent.core.designsystem.theme.LocalAriesGlassBackdrop
+import com.ai.phoneagent.core.designsystem.theme.ariesGlassBackdropBlur
+import com.ai.phoneagent.core.designsystem.theme.ariesGlassBackdropSource
+import com.ai.phoneagent.core.designsystem.theme.ariesGlassBorder
+import com.ai.phoneagent.core.designsystem.theme.rememberAriesGlassBackdropBlur
+import com.ai.phoneagent.core.designsystem.theme.rememberAriesGlassColors
 import com.ai.phoneagent.ui.debug.DebugRecomposeLogger
 import com.ai.phoneagent.ui.drawer.ConversationDrawer
 import com.ai.phoneagent.ui.drawer.DrawerConversationUiItem
@@ -53,6 +66,7 @@ import com.ai.phoneagent.ui.messages.conversationTranscriptItems
 import com.ai.phoneagent.ui.topbar.MainTopBar
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.flow.distinctUntilChanged
+import com.ai.phoneagent.core.designsystem.theme.ariesColorResource
 
 @Composable
 fun HomeScreen(
@@ -63,7 +77,6 @@ fun HomeScreen(
     onToggleStatus: () -> Unit,
     onOpenDrawer: () -> Unit,
     onNewChat: () -> Unit,
-    onOpenFloatingWindow: () -> Unit,
     modelName: String = "",
     drawerSearchQuery: String,
     drawerItems: List<DrawerConversationUiItem>,
@@ -79,17 +92,18 @@ fun HomeScreen(
     contentScale: Float,
     onboardingContent: @Composable (() -> Unit)? = null,
     historyDialogContent: @Composable (() -> Unit)? = null,
+    /** 历史记录等全屏弹层展开时，让被遮挡的页面整体降焦（液态玻璃的「背景降焦」）。 */
+    backdropBlurEnabled: Boolean = false,
     onDrawerClosed: () -> Unit = {},
 ) {
     DebugRecomposeLogger(scope = "HomeScreen")
     val drawerWidth = dimensionResource(R.dimen.m3t_drawer_width)
+    val drawerMaxWidth = dimensionResource(R.dimen.m3t_drawer_max_width)
     val spacingMd = dimensionResource(R.dimen.m3t_spacing_md)
     val spacingXl = dimensionResource(R.dimen.m3t_spacing_xl)
     val dialogPadding = dimensionResource(R.dimen.m3t_dialog_padding)
     val spacingXxxs = dimensionResource(R.dimen.m3t_spacing_xxxs)
     val density = LocalDensity.current
-    var bottomOverlayHeightPx by remember { mutableIntStateOf(0) }
-    val bottomOverlayPadding = with(density) { bottomOverlayHeightPx.toDp() }
     val scaffoldModifier =
         if (contentAlpha != 1f || contentScale != 1f) {
             Modifier
@@ -109,21 +123,47 @@ fun HomeScreen(
         }
     }
 
+    val glassColors = rememberAriesGlassColors()
+    val backdropBlurRadius = rememberAriesGlassBackdropBlur()
+    val glassBackdrop = LocalAriesGlassBackdrop.current
+    val imeVisible = WindowInsets.ime.getBottom(density) > 0
+    var inputBarHeightPx by remember { mutableIntStateOf(0) }
+    var aiNoticeHeightPx by remember { mutableIntStateOf(0) }
+    val bottomOverlayPadding = with(density) {
+        inputBarHeightPx.toDp() + aiNoticeHeightPx.toDp() + spacingXxxs * 2
+    }
+    // 抽屉只使用玻璃描边而不采样正文；采样源仍服务顶栏与输入框。
+
+    // 画布由 MainActivity 的全局 AriesGlassCanvas 提供；此处不再重复铺一层渐变，
+    // 否则同一套 verticalGradient + 柔光会叠两遍，所有按画布亮度挑选的 alpha 都会失准。
+    Box(modifier = Modifier.fillMaxSize()) {
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = drawerGesturesEnabled,
-        scrimColor = colorResource(R.color.m3t_drawer_scrim),
+        scrimColor = ariesColorResource(R.color.m3t_drawer_scrim),
         drawerContent = {
             ModalDrawerSheet(
                 modifier = Modifier
-                    .width(drawerWidth),
-                drawerContainerColor = MaterialTheme.colorScheme.surface,
+                    .widthIn(max = drawerMaxWidth)
+                    .width(drawerWidth)
+                    // Salt 式比例侧栏；不在密集文字区域采样页面 backdrop，避免正文穿透。
+                    .ariesGlassBorder(
+                        shape = RoundedCornerShape(topEnd = dimensionResource(DesignR.dimen.m3t_salt_card_radius)),
+                        color = glassColors.border,
+                        width = dimensionResource(DesignR.dimen.m3t_glass_border_width),
+                    ),
+                drawerShape = RoundedCornerShape(topEnd = dimensionResource(DesignR.dimen.m3t_salt_card_radius)),
+                // 参考图里的导航区是不透底的独立面板；抽屉内容密集，使用实色令牌避免文字透底。
+                drawerContainerColor = ariesColorResource(R.color.m3t_drawer_background),
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .statusBarsPadding()
                         .navigationBarsPadding()
+                        // 抽屉里的「搜索聊天」输入框同样需要 IME inset：
+                        // MainActivity 关闭了 decorFitsSystemWindows，adjustResize 不再生效。
+                        .windowInsetsPadding(WindowInsets.ime)
                         .padding(horizontal = dialogPadding, vertical = spacingXl),
                 ) {
                     ConversationDrawer(
@@ -134,6 +174,7 @@ fun HomeScreen(
                         onConversationClick = onDrawerConversationClick,
                         onConversationLongClick = onDrawerConversationLongClick,
                         onSettingsClick = onDrawerSettingsClick,
+                        onNewChatClick = onNewChat,
                     )
                 }
             }
@@ -142,6 +183,7 @@ fun HomeScreen(
         Box(modifier = Modifier.fillMaxSize()) {
             Scaffold(
                 modifier = scaffoldModifier,
+                containerColor = Color.Transparent,
                 topBar = {
                     MainTopBar(
                         statusText = statusText,
@@ -149,28 +191,53 @@ fun HomeScreen(
                         onToggleStatus = onToggleStatus,
                         onOpenDrawer = onOpenDrawer,
                         onNewChat = onNewChat,
-                        onOpenFloatingWindow = onOpenFloatingWindow,
                         modelName = modelName,
                     )
                 },
             ) { paddingValues: PaddingValues ->
+                // 输入栏单独消费 IME；AI 提示在 HomeBottomOverlay 中补偿 IME 位移并留在屏幕底部。
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                        .imePadding(),
+                    modifier = Modifier.fillMaxSize(),
                 ) {
-                    transcriptPaneContent(bottomOverlayPadding, spacingMd, spacingXxxs)
+                    // 液态玻璃的「采样源」：一个全屏大小的层，但**只录正文列表**。
+                    // 顶栏与输入栏是它的兄弟节点（不在这一层里），所以玻璃面永远采不到
+                    // 自己 —— Kyant Backdrop 的 `layerBackdrop`（源）与 `drawBackdrop`（玻璃面）
+                    // 同样要求两者是兄弟关系：若玻璃面落在源内部，它会采到上一帧的自身像素，
+                    // 逐帧复合后变成鬼影。
+                    // 层尺寸取全屏（padding 加在内层）是为了让顶栏、抽屉等位于正文之外的
+                    // 玻璃面也落在采样范围内，越界采样会读到边缘像素。
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .ariesGlassBackdropSource(glassBackdrop),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(paddingValues),
+                        ) {
+                            // 「背景降焦」只作用于正文列表：弹层展开时正文失焦，
+                            // 顶栏与输入栏保持清晰（原先整棵 Scaffold 一起糊，连输入栏都看不清）。
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .ariesGlassBackdropBlur(
+                                        enabled = backdropBlurEnabled,
+                                        radius = backdropBlurRadius,
+                                    ),
+                            ) {
+                                transcriptPaneContent(bottomOverlayPadding, spacingMd, spacingXxxs)
+                            }
+                        }
+                    }
 
                     HomeBottomOverlay(
                         aiNoticeText = aiNoticeText,
                         inputBarContent = inputBarContent,
                         spacingXxxs = spacingXxxs,
-                        onHeightChanged = { height ->
-                            if (bottomOverlayHeightPx != height) {
-                                bottomOverlayHeightPx = height
-                            }
-                        },
+                        imeVisible = imeVisible,
+                        onInputBarHeightChanged = { inputBarHeightPx = it },
+                        onAiNoticeHeightChanged = { aiNoticeHeightPx = it },
                     )
                 }
             }
@@ -178,6 +245,7 @@ fun HomeScreen(
             onboardingContent?.invoke()
             historyDialogContent?.invoke()
         }
+    }
     }
 }
 
@@ -353,23 +421,58 @@ private fun BoxScope.HomeBottomOverlay(
     aiNoticeText: String,
     inputBarContent: @Composable () -> Unit,
     spacingXxxs: Dp,
-    onHeightChanged: (Int) -> Unit,
+    imeVisible: Boolean,
+    onInputBarHeightChanged: (Int) -> Unit,
+    onAiNoticeHeightChanged: (Int) -> Unit,
 ) {
     DebugRecomposeLogger(scope = "HomeBottomOverlay")
-    Column(
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .fillMaxWidth()
-            .onSizeChanged { onHeightChanged(it.height) }
-            .padding(bottom = spacingXxxs),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        inputBarContent()
-        Text(
-            text = aiNoticeText,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = spacingXxxs),
-        )
+    if (imeVisible) {
+        // 键盘打开时只抬升输入栏；说明仍留在物理屏幕底部（由键盘覆盖），不参与 IME 位移。
+        Box(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.ime),
+            ) {
+                Box(modifier = Modifier.onSizeChanged { onInputBarHeightChanged(it.height) }) {
+                    inputBarContent()
+                }
+            }
+            Text(
+                text = aiNoticeText,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(bottom = spacingXxxs, top = spacingXxxs)
+                    .onSizeChanged { onAiNoticeHeightChanged(it.height) },
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+        }
+    } else {
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(modifier = Modifier.onSizeChanged { onInputBarHeightChanged(it.height) }) {
+                inputBarContent()
+            }
+            Spacer(modifier = Modifier.height(spacingXxxs))
+            Text(
+                text = aiNoticeText,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(bottom = spacingXxxs, top = spacingXxxs)
+                    .onSizeChanged { onAiNoticeHeightChanged(it.height) },
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+        }
     }
 }

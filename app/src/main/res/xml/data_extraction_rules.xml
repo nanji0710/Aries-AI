@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <!--
   Android 12+ 数据提取规则：与 backup_rules.xml 保持同一份排除清单。
   敏感 secrets 位于 `app_secrets`，非敏感偏好位于 `app_preferences`；历史混合存储
@@ -13,6 +13,9 @@
         <exclude domain="file" path="datastore/automation_results.preferences_pb"/>
         <exclude domain="file" path="datastore/telemetry_prefs.preferences_pb"/>
         <exclude domain="sharedpref" path="app_prefs.xml"/>
+        <!-- 离线语音模型约 135 MB（2026-10 起改为首次运行时下载），不进云备份 -->
+        <exclude domain="file" path="sherpa-ncnn-streaming-zipformer-bilingual-zh-en-2023-02-13"/>
+        <exclude domain="file" path="sherpa-models"/>
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="datastore/app_secrets.preferences_pb"/>
@@ -21,5 +24,7 @@
         <exclude domain="file" path="datastore/automation_results.preferences_pb"/>
         <exclude domain="file" path="datastore/telemetry_prefs.preferences_pb"/>
         <exclude domain="sharedpref" path="app_prefs.xml"/>
+        <exclude domain="file" path="sherpa-ncnn-streaming-zipformer-bilingual-zh-en-2023-02-13"/>
+        <exclude domain="file" path="sherpa-models"/>
     </device-transfer>
 </data-extraction-rules>

@@ -10,7 +10,6 @@ import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,6 +46,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.ai.phoneagent.core.designsystem.theme.LocalAriesIsDarkTheme
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Download
 import com.composables.icons.lucide.Expand
@@ -74,7 +74,7 @@ private val mermaidHeightCache = HashMap<String, Int>()
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun Mermaid(code: String, modifier: Modifier = Modifier) {
-    val isDark   = isSystemInDarkTheme()
+    val isDark   = LocalAriesIsDarkTheme.current
     val context  = LocalContext.current
     val density  = LocalDensity.current
     val cs       = MaterialTheme.colorScheme

@@ -18,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -208,6 +209,25 @@ class AppPreferencesRepository(
     val ariesApiKeyFlow: Flow<String> =
         readySecretsFlow.map { prefs ->
             prefs.readSecret(Keys.ariesApiKey)
+        }
+
+    /**
+     * [getActiveAriesApiKey] 的响应式版本，语义完全一致：
+     * 优先 Aries 专用 Key，未设置时在已登录 Aries 账号的前提下回退到通用 apiKey。
+     *
+     * 供 UI/ViewModel 替代 `getActiveAriesApiKeyBlocking()`——后者会在调用线程上
+     * 走 AndroidKeyStore 解密（keystore2 binder IPC + AES-GCM），在主线程调用会造成掉帧/卡顿。
+     */
+    val activeAriesApiKeyFlow: Flow<String> =
+        combine(readySecretsFlow, readyPrefsFlow) { secrets, prefs ->
+            val ariesKey = secrets.readSecret(Keys.ariesApiKey)
+            if (ariesKey.isNotBlank()) {
+                ariesKey
+            } else if (prefs[Keys.ariesLoggedInUser].orEmpty().isNotBlank()) {
+                secrets.readSecret(Keys.apiKey)
+            } else {
+                ""
+            }
         }
 
     val apiThirdPartyBaseUrlFlow: Flow<String> =
@@ -471,6 +491,10 @@ class AppPreferencesRepository(
         }
     }
 
+    suspend fun getUserAgreementAccepted(): Boolean = readyPrefsFlow.first()[Keys.userAgreementAccepted] ?: false
+
+    suspend fun getPermGuideShown(): Boolean = readyPrefsFlow.first()[Keys.permGuideShown] ?: false
+
     suspend fun getConversations(): String? {
         val prefs = readyPrefsFlow.first()
         return prefs[Keys.conversations]
@@ -645,69 +669,75 @@ class AppPreferencesRepository(
         }
     }
 
+    // ─── 非阻塞读取（此前只有 *Blocking() 版本，迫使调用方在主线程 runBlocking）───
+
+    suspend fun getApiUseThirdParty(): Boolean = readyPrefsFlow.first()[Keys.apiUseThirdParty] ?: false
+
+    suspend fun getApiUseLocalModel(): Boolean = readyPrefsFlow.first()[Keys.apiUseLocalModel] ?: false
+
+    suspend fun getUseAriesApi(): Boolean = readyPrefsFlow.first()[Keys.useAriesApi] ?: false
+
+    suspend fun getApiThirdPartyBaseUrl(): String = readyPrefsFlow.first()[Keys.apiThirdPartyBaseUrl] ?: ""
+
+    suspend fun getApiThirdPartyModel(): String = readyPrefsFlow.first()[Keys.apiThirdPartyModel] ?: ""
+
+    suspend fun hasApiLastCheckOk(): Boolean = readyPrefsFlow.first().contains(Keys.apiLastCheckOk)
+
     // ─── Blocking helpers for non-coroutine call sites ───────────────────────
+    //
+    // 全部使用 `runBlocking(Dispatchers.IO)` 而不是裸 `runBlocking { }`：
+    // 裸 `runBlocking` 会把协程续体排在**调用线程**的事件循环上（Android 主线程的 Looper /
+    // AndroidUiDispatcher trampoline 队列）。当调用方是主线程时，主线程正 park 在
+    // `BlockingCoroutine.joinBlocking` 里，永远跑不到自己队列上的续体 —— 自锁死锁。
+    // 2026-10-10 的两份 ANR trace（`writeApiConfigBlocking` ← `AppPrefsCompat$Editor.apply`）
+    // 就是这条路径。传入 `Dispatchers.IO` 后 `joinBlocking` 不再需要调用线程的事件循环，
+    // 续体在 IO worker 上推进，调用线程只负责等待。
 
     /** Blocking snapshot of the entire prefs — use only from non-suspend call sites. */
-    fun getApiKeyBlocking(): String = runBlocking { getApiKey() }
-    fun getApiUseThirdPartyBlocking(): Boolean = runBlocking {
-        readyPrefsFlow.first()[Keys.apiUseThirdParty] ?: false
-    }
-    fun getApiUseLocalModelBlocking(): Boolean = runBlocking {
-        readyPrefsFlow.first()[Keys.apiUseLocalModel] ?: false
-    }
-    fun getUseAriesApiBlocking(): Boolean = runBlocking {
-        readyPrefsFlow.first()[Keys.useAriesApi] ?: false
-    }
-    fun getAriesApiSectionUnlockedBlocking(): Boolean = runBlocking { getAriesApiSectionUnlocked() }
-    fun setAriesApiSectionUnlockedBlocking(value: Boolean) = runBlocking { setAriesApiSectionUnlocked(value) }
-    fun getAriesLoggedInUserBlocking(): String = runBlocking { getAriesLoggedInUser() }
-    fun setAriesLoggedInUserBlocking(value: String) = runBlocking { setAriesLoggedInUser(value) }
-    fun getAriesSelectedModelBlocking(): String = runBlocking { getAriesSelectedModel() }
-    fun setAriesSelectedModelBlocking(value: String) = runBlocking { setAriesSelectedModel(value) }
-    fun getAriesApiKeyBlocking(): String = runBlocking { getAriesApiKey() }
-    fun setAriesApiKeyBlocking(value: String) = runBlocking { setAriesApiKey(value) }
-    fun getActiveAriesApiKeyBlocking(): String = runBlocking { getActiveAriesApiKey() }
-    fun getApiThirdPartyBaseUrlBlocking(): String = runBlocking {
-        readyPrefsFlow.first()[Keys.apiThirdPartyBaseUrl] ?: ""
-    }
-    fun getApiThirdPartyModelBlocking(): String = runBlocking {
-        readyPrefsFlow.first()[Keys.apiThirdPartyModel] ?: ""
-    }
-    fun getApiLastCheckSigBlocking(): String = runBlocking { getApiLastCheckSig() }
-    fun getApiLastCheckOkBlocking(): Boolean = runBlocking { getApiLastCheckOk() }
-    fun hasApiLastCheckOkBlocking(): Boolean = runBlocking {
-        readyPrefsFlow.first().contains(Keys.apiLastCheckOk)
-    }
-    fun getUserAgreementAcceptedBlocking(): Boolean = runBlocking {
-        readyPrefsFlow.first()[Keys.userAgreementAccepted] ?: false
-    }
-    fun getPermGuideShownBlocking(): Boolean = runBlocking {
-        readyPrefsFlow.first()[Keys.permGuideShown] ?: false
-    }
-    fun getAutoglmApiKeyBlocking(): String = runBlocking { getAutoglmApiKey() }
-    fun getApiLastCheckKeyBlocking(): String = runBlocking { getApiLastCheckKey() }
-    fun getApiLastCheckTimeBlocking(): Long = runBlocking { getApiLastCheckTime() }
-    fun getLegacyConversationsJsonBlocking(): String? = runBlocking { getLegacyConversationsJson() }
+    fun getApiKeyBlocking(): String = runBlocking(Dispatchers.IO) { getApiKey() }
+    fun getApiUseThirdPartyBlocking(): Boolean = runBlocking(Dispatchers.IO) { getApiUseThirdParty() }
+    fun getApiUseLocalModelBlocking(): Boolean = runBlocking(Dispatchers.IO) { getApiUseLocalModel() }
+    fun getUseAriesApiBlocking(): Boolean = runBlocking(Dispatchers.IO) { getUseAriesApi() }
+    fun getAriesApiSectionUnlockedBlocking(): Boolean = runBlocking(Dispatchers.IO) { getAriesApiSectionUnlocked() }
+    fun setAriesApiSectionUnlockedBlocking(value: Boolean) = runBlocking(Dispatchers.IO) { setAriesApiSectionUnlocked(value) }
+    fun getAriesLoggedInUserBlocking(): String = runBlocking(Dispatchers.IO) { getAriesLoggedInUser() }
+    fun setAriesLoggedInUserBlocking(value: String) = runBlocking(Dispatchers.IO) { setAriesLoggedInUser(value) }
+    fun getAriesSelectedModelBlocking(): String = runBlocking(Dispatchers.IO) { getAriesSelectedModel() }
+    fun setAriesSelectedModelBlocking(value: String) = runBlocking(Dispatchers.IO) { setAriesSelectedModel(value) }
+    fun getAriesApiKeyBlocking(): String = runBlocking(Dispatchers.IO) { getAriesApiKey() }
+    fun setAriesApiKeyBlocking(value: String) = runBlocking(Dispatchers.IO) { setAriesApiKey(value) }
+    fun getActiveAriesApiKeyBlocking(): String = runBlocking(Dispatchers.IO) { getActiveAriesApiKey() }
+    fun getApiThirdPartyBaseUrlBlocking(): String = runBlocking(Dispatchers.IO) { getApiThirdPartyBaseUrl() }
+    fun getApiThirdPartyModelBlocking(): String = runBlocking(Dispatchers.IO) { getApiThirdPartyModel() }
+    fun getApiLastCheckSigBlocking(): String = runBlocking(Dispatchers.IO) { getApiLastCheckSig() }
+    fun getApiLastCheckOkBlocking(): Boolean = runBlocking(Dispatchers.IO) { getApiLastCheckOk() }
+    fun hasApiLastCheckOkBlocking(): Boolean = runBlocking(Dispatchers.IO) { hasApiLastCheckOk() }
+    fun getUserAgreementAcceptedBlocking(): Boolean = runBlocking(Dispatchers.IO) { getUserAgreementAccepted() }
+    fun getPermGuideShownBlocking(): Boolean = runBlocking(Dispatchers.IO) { getPermGuideShown() }
+    fun getAutoglmApiKeyBlocking(): String = runBlocking(Dispatchers.IO) { getAutoglmApiKey() }
+    fun getApiLastCheckKeyBlocking(): String = runBlocking(Dispatchers.IO) { getApiLastCheckKey() }
+    fun getApiLastCheckTimeBlocking(): Long = runBlocking(Dispatchers.IO) { getApiLastCheckTime() }
+    fun getLegacyConversationsJsonBlocking(): String? = runBlocking(Dispatchers.IO) { getLegacyConversationsJson() }
     fun getLegacyActiveConversationIdBlocking(defaultValue: Long = -1L): Long =
-        runBlocking { getLegacyActiveConversationId(defaultValue) }
+        runBlocking(Dispatchers.IO) { getLegacyActiveConversationId(defaultValue) }
 
-    fun setApiKeyBlocking(value: String) = runBlocking { setApiKey(value) }
-    fun setApiUseThirdPartyBlocking(value: Boolean) = runBlocking { setApiUseThirdParty(value) }
-    fun setApiUseLocalModelBlocking(value: Boolean) = runBlocking { setApiUseLocalModel(value) }
-    fun setUseAriesApiBlocking(value: Boolean) = runBlocking { setUseAriesApi(value) }
-    fun setApiThirdPartyBaseUrlBlocking(value: String) = runBlocking { setApiThirdPartyBaseUrl(value) }
-    fun setApiThirdPartyModelBlocking(value: String) = runBlocking { setApiThirdPartyModel(value) }
-    fun setApiLastCheckKeyBlocking(value: String) = runBlocking { setApiLastCheckKey(value) }
-    fun setApiLastCheckOkBlocking(value: Boolean) = runBlocking { setApiLastCheckOk(value) }
-    fun setApiLastCheckTimeBlocking(value: Long) = runBlocking { setApiLastCheckTime(value) }
-    fun setApiLastCheckSigBlocking(value: String) = runBlocking { setApiLastCheckSig(value) }
-    fun setConversationsBlocking(value: String?) = runBlocking { setConversations(value) }
-    fun setLegacyConversationsJsonBlocking(value: String?) = runBlocking { setLegacyConversationsJson(value) }
-    fun setLegacyActiveConversationIdBlocking(value: Long?) = runBlocking {
+    fun setApiKeyBlocking(value: String) = runBlocking(Dispatchers.IO) { setApiKey(value) }
+    fun setApiUseThirdPartyBlocking(value: Boolean) = runBlocking(Dispatchers.IO) { setApiUseThirdParty(value) }
+    fun setApiUseLocalModelBlocking(value: Boolean) = runBlocking(Dispatchers.IO) { setApiUseLocalModel(value) }
+    fun setUseAriesApiBlocking(value: Boolean) = runBlocking(Dispatchers.IO) { setUseAriesApi(value) }
+    fun setApiThirdPartyBaseUrlBlocking(value: String) = runBlocking(Dispatchers.IO) { setApiThirdPartyBaseUrl(value) }
+    fun setApiThirdPartyModelBlocking(value: String) = runBlocking(Dispatchers.IO) { setApiThirdPartyModel(value) }
+    fun setApiLastCheckKeyBlocking(value: String) = runBlocking(Dispatchers.IO) { setApiLastCheckKey(value) }
+    fun setApiLastCheckOkBlocking(value: Boolean) = runBlocking(Dispatchers.IO) { setApiLastCheckOk(value) }
+    fun setApiLastCheckTimeBlocking(value: Long) = runBlocking(Dispatchers.IO) { setApiLastCheckTime(value) }
+    fun setApiLastCheckSigBlocking(value: String) = runBlocking(Dispatchers.IO) { setApiLastCheckSig(value) }
+    fun setConversationsBlocking(value: String?) = runBlocking(Dispatchers.IO) { setConversations(value) }
+    fun setLegacyConversationsJsonBlocking(value: String?) = runBlocking(Dispatchers.IO) { setLegacyConversationsJson(value) }
+    fun setLegacyActiveConversationIdBlocking(value: Long?) = runBlocking(Dispatchers.IO) {
         setLegacyActiveConversationId(value)
     }
-    fun getQwenPendingDownloadIdsBlocking(): Set<String> = runBlocking { getQwenPendingDownloadIds() }
-    fun setQwenPendingDownloadIdsBlocking(value: Set<String>) = runBlocking { setQwenPendingDownloadIds(value) }
+    fun getQwenPendingDownloadIdsBlocking(): Set<String> = runBlocking(Dispatchers.IO) { getQwenPendingDownloadIds() }
+    fun setQwenPendingDownloadIdsBlocking(value: Set<String>) = runBlocking(Dispatchers.IO) { setQwenPendingDownloadIds(value) }
 
     /**
      * Batch-write API config; pass null to leave a key untouched, blank to remove a secret.
@@ -778,7 +808,7 @@ class AppPreferencesRepository(
         lastCheckTime: Long? = null,
         lastCheckSig: String? = null,
         clearCheckResults: Boolean = false,
-    ): Boolean = runBlocking {
+    ): Boolean = runBlocking(Dispatchers.IO) {
         writeApiConfig(
             apiKey = apiKey,
             removeApiKey = removeApiKey,
@@ -794,29 +824,29 @@ class AppPreferencesRepository(
         )
     }
 
-    fun setUserAgreementAcceptedBlocking(value: Boolean) = runBlocking { setUserAgreementAccepted(value) }
-    fun setPermGuideShownBlocking(value: Boolean) = runBlocking { setPermGuideShown(value) }
+    fun setUserAgreementAcceptedBlocking(value: Boolean) = runBlocking(Dispatchers.IO) { setUserAgreementAccepted(value) }
+    fun setPermGuideShownBlocking(value: Boolean) = runBlocking(Dispatchers.IO) { setPermGuideShown(value) }
 
-    fun getThemeModeBlocking(): String = runBlocking { getThemeMode() }
-    fun setThemeModeBlocking(value: String) = runBlocking { setThemeMode(value) }
-    fun getThemeColorStyleBlocking(): String = runBlocking { getThemeColorStyle() }
-    fun setThemeColorStyleBlocking(value: String) = runBlocking { setThemeColorStyle(value) }
-    fun getThemeAccentBlocking(): String = runBlocking { getThemeAccent() }
-    fun setThemeAccentBlocking(value: String) = runBlocking { setThemeAccent(value) }
-    fun getAmoledDarkEnabledBlocking(): Boolean = runBlocking { getAmoledDarkEnabled() }
-    fun setAmoledDarkEnabledBlocking(value: Boolean) = runBlocking { setAmoledDarkEnabled(value) }
-    fun getDynamicColorEnabledBlocking(): Boolean = runBlocking { getDynamicColorEnabled() }
-    fun setDynamicColorEnabledBlocking(value: Boolean) = runBlocking { setDynamicColorEnabled(value) }
-    fun getChatFontScaleBlocking(): Float = runBlocking { getChatFontScale() }
-    fun setChatFontScaleBlocking(value: Float) = runBlocking { setChatFontScale(value) }
-    fun getChatFontFamilyBlocking(): String = runBlocking { getChatFontFamily() }
-    fun setChatFontFamilyBlocking(value: String) = runBlocking { setChatFontFamily(value) }
-    fun getCodeAutoWrapBlocking(): Boolean = runBlocking { getCodeAutoWrap() }
-    fun setCodeAutoWrapBlocking(value: Boolean) = runBlocking { setCodeAutoWrap(value) }
-    fun getCodeLineNumbersBlocking(): Boolean = runBlocking { getCodeLineNumbers() }
-    fun setCodeLineNumbersBlocking(value: Boolean) = runBlocking { setCodeLineNumbers(value) }
-    fun getCodeAutoCollapseBlocking(): Boolean = runBlocking { getCodeAutoCollapse() }
-    fun setCodeAutoCollapseBlocking(value: Boolean) = runBlocking { setCodeAutoCollapse(value) }
+    fun getThemeModeBlocking(): String = runBlocking(Dispatchers.IO) { getThemeMode() }
+    fun setThemeModeBlocking(value: String) = runBlocking(Dispatchers.IO) { setThemeMode(value) }
+    fun getThemeColorStyleBlocking(): String = runBlocking(Dispatchers.IO) { getThemeColorStyle() }
+    fun setThemeColorStyleBlocking(value: String) = runBlocking(Dispatchers.IO) { setThemeColorStyle(value) }
+    fun getThemeAccentBlocking(): String = runBlocking(Dispatchers.IO) { getThemeAccent() }
+    fun setThemeAccentBlocking(value: String) = runBlocking(Dispatchers.IO) { setThemeAccent(value) }
+    fun getAmoledDarkEnabledBlocking(): Boolean = runBlocking(Dispatchers.IO) { getAmoledDarkEnabled() }
+    fun setAmoledDarkEnabledBlocking(value: Boolean) = runBlocking(Dispatchers.IO) { setAmoledDarkEnabled(value) }
+    fun getDynamicColorEnabledBlocking(): Boolean = runBlocking(Dispatchers.IO) { getDynamicColorEnabled() }
+    fun setDynamicColorEnabledBlocking(value: Boolean) = runBlocking(Dispatchers.IO) { setDynamicColorEnabled(value) }
+    fun getChatFontScaleBlocking(): Float = runBlocking(Dispatchers.IO) { getChatFontScale() }
+    fun setChatFontScaleBlocking(value: Float) = runBlocking(Dispatchers.IO) { setChatFontScale(value) }
+    fun getChatFontFamilyBlocking(): String = runBlocking(Dispatchers.IO) { getChatFontFamily() }
+    fun setChatFontFamilyBlocking(value: String) = runBlocking(Dispatchers.IO) { setChatFontFamily(value) }
+    fun getCodeAutoWrapBlocking(): Boolean = runBlocking(Dispatchers.IO) { getCodeAutoWrap() }
+    fun setCodeAutoWrapBlocking(value: Boolean) = runBlocking(Dispatchers.IO) { setCodeAutoWrap(value) }
+    fun getCodeLineNumbersBlocking(): Boolean = runBlocking(Dispatchers.IO) { getCodeLineNumbers() }
+    fun setCodeLineNumbersBlocking(value: Boolean) = runBlocking(Dispatchers.IO) { setCodeLineNumbers(value) }
+    fun getCodeAutoCollapseBlocking(): Boolean = runBlocking(Dispatchers.IO) { getCodeAutoCollapse() }
+    fun setCodeAutoCollapseBlocking(value: Boolean) = runBlocking(Dispatchers.IO) { setCodeAutoCollapse(value) }
 
     private fun resolveThemeColorStyleStorage(
         prefs: androidx.datastore.preferences.core.Preferences,

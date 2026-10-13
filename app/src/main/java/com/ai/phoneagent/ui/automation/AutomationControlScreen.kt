@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -46,8 +47,8 @@ import com.composables.icons.lucide.CircleStop
 import com.composables.icons.lucide.SlidersHorizontal
 import com.composables.icons.lucide.Smartphone
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import com.ai.phoneagent.core.designsystem.theme.AriesGlassPanel
+import com.ai.phoneagent.core.designsystem.theme.rememberAriesGlassCardShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
@@ -77,6 +78,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import com.ai.phoneagent.R
 import com.ai.phoneagent.ui.components.InfoTooltip
+import com.ai.phoneagent.core.designsystem.R as DesignR
+import com.ai.phoneagent.core.designsystem.theme.ariesColorResource
 
 enum class AutomationStatusTone {
     Ready,
@@ -139,7 +142,7 @@ fun AutomationControlScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.automation_toolbar_title)) },
@@ -158,7 +161,7 @@ fun AutomationControlScreen(
                 },
                 colors =
                     TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
+                        containerColor = ariesColorResource(DesignR.color.m3t_glass_bar),
                     ),
                 modifier = Modifier.statusBarsPadding(),
             )
@@ -169,12 +172,15 @@ fun AutomationControlScreen(
                 Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .navigationBarsPadding(),
+                    .navigationBarsPadding()
+                    // 任务输入框需要 IME inset：MainActivity 关闭了 decorFitsSystemWindows，
+                    // adjustResize 不再生效，必须由 Compose 自行消费 IME inset。
+                    .imePadding(),
             contentPadding = PaddingValues(start = spacingLg, top = spacingSm, end = spacingLg, bottom = spacingXl),
             verticalArrangement = Arrangement.spacedBy(spacingMd),
         ) {
             item {
-                AutomationSectionCard(containerColor = statusPalette.container.copy(alpha = 0.52f)) {
+                AutomationSectionCard(containerColor = statusPalette.container) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -187,18 +193,18 @@ fun AutomationControlScreen(
                             Text(
                                 text = stringResource(R.string.automation_console_runtime_title),
                                 style = MaterialTheme.typography.labelLarge,
-                                color = statusPalette.content.copy(alpha = 0.8f),
+                                color = statusPalette.content,
                             )
                             Text(
                                 text = stringResource(R.string.automation_console_runtime_subtitle),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = statusPalette.content.copy(alpha = 0.72f),
+                                color = statusPalette.content,
                             )
                         }
                         Spacer(modifier = Modifier.width(spacingSm))
                         AutomationStatusBadge(
                             text = statusTone.badgeText(),
-                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                             contentColor = statusPalette.accent,
                         )
                     }
@@ -215,7 +221,7 @@ fun AutomationControlScreen(
                     Text(
                         text = interactionModeText,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = statusPalette.content.copy(alpha = 0.82f),
+                        color = statusPalette.content,
                     )
 
                     Spacer(modifier = Modifier.height(spacingMd))
@@ -292,7 +298,7 @@ fun AutomationControlScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(spacingLg)) {
                             Spacer(modifier = Modifier.height(spacingSm))
                             Surface(
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
                                 shape = MaterialTheme.shapes.large,
                             ) {
                                 Column(
@@ -351,7 +357,7 @@ private fun AutomationConnectionBadge(
 
     Surface(
         modifier = modifier,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = RoundedCornerShape(dimensionResource(R.dimen.m3t_radius_lg)),
     ) {
         Row(
@@ -379,21 +385,21 @@ private fun statusPalette(statusTone: AutomationStatusTone): AutomationStatusPal
     when (statusTone) {
         AutomationStatusTone.Ready ->
             AutomationStatusPalette(
-                container = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+                container = MaterialTheme.colorScheme.primaryContainer,
                 content = MaterialTheme.colorScheme.onPrimaryContainer,
                 accent = MaterialTheme.colorScheme.primary,
             )
 
         AutomationStatusTone.Partial ->
             AutomationStatusPalette(
-                container = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.72f),
+                container = MaterialTheme.colorScheme.tertiaryContainer,
                 content = MaterialTheme.colorScheme.onTertiaryContainer,
                 accent = MaterialTheme.colorScheme.tertiary,
             )
 
         AutomationStatusTone.Inactive ->
             AutomationStatusPalette(
-                container = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.72f),
+                container = MaterialTheme.colorScheme.errorContainer,
                 content = MaterialTheme.colorScheme.onErrorContainer,
                 accent = MaterialTheme.colorScheme.error,
             )
@@ -406,17 +412,18 @@ private fun AutomationSectionCard(
     contentPadding: PaddingValues = PaddingValues(dimensionResource(R.dimen.m3t_spacing_lg)),
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Card(
+    AriesGlassPanel(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        shape = MaterialTheme.shapes.extraLarge,
+        shape = rememberAriesGlassCardShape(),
+        tint = if (containerColor == MaterialTheme.colorScheme.surface) Color.Unspecified else containerColor,
+        sampleBackdrop = containerColor == MaterialTheme.colorScheme.surface,
+        elevated = true,
+        contentPadding = contentPadding,
     ) {
         Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .animateContentSize(tween(durationMillis = 180, easing = FastOutSlowInEasing))
-                    .padding(contentPadding),
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(tween(durationMillis = 180, easing = FastOutSlowInEasing)),
             verticalArrangement = Arrangement.Top,
             content = content,
         )
@@ -507,7 +514,7 @@ private fun AutomationModeOption(
         if (selected) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)
+            MaterialTheme.colorScheme.surfaceContainerHigh
         }
     val titleColor =
         if (selected) {
@@ -517,7 +524,7 @@ private fun AutomationModeOption(
         }
     val summaryColor =
         if (selected) {
-            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f)
+            MaterialTheme.colorScheme.onPrimaryContainer
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
         }

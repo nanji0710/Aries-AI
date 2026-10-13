@@ -59,7 +59,9 @@ fun ConversationHistoryDialog(
         modifier =
             modifier
                 .fillMaxSize()
-                .background(Color.Transparent)
+                // 历史弹窗原本没有任何遮罩，卡片直接压在正文上：加一层 48% 暗化，
+                // 让弹窗与背后的消息列表形成层次（点击空白仍然关闭）。
+                .background(Color.Black.copy(alpha = 0.48f))
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -78,7 +80,7 @@ fun ConversationHistoryDialog(
                         onClick = {},
                     ),
             shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surface,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = dimensionResource(R.dimen.m3t_spacing_xxxs),
             shadowElevation = dimensionResource(R.dimen.m3t_spacing_sm),
         ) {

@@ -19,7 +19,7 @@ import kotlin.test.assertTrue
  */
 class DataStoreRepositoryTest {
 
-    // ─── AppPreferencesRepository API surface ────────────────────────────────
+    // 鈹€鈹€鈹€ AppPreferencesRepository API surface 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     @Test
     fun `AppPreferencesRepository class exists and is instantiable type`() {
@@ -99,72 +99,6 @@ class DataStoreRepositoryTest {
         assertTrue("Context" in paramTypes, "Constructor should take Context, got: $paramTypes")
     }
 
-    // ─── FloatingChatPreferencesRepository API surface ───────────────────────
-
-    @Test
-    fun `FloatingChatPreferencesRepository class exists and is instantiable type`() {
-        val clazz = FloatingChatPreferencesRepository::class
-        assertNotNull(clazz)
-        assertEquals("FloatingChatPreferencesRepository", clazz.simpleName)
-    }
-
-    @Test
-    fun `FloatingChatPreferencesRepository has expected suspend methods`() {
-        val methods = FloatingChatPreferencesRepository::class.java.declaredMethods.map { it.name }.toSet()
-
-        assertTrue("getFloatingMessages" in methods, "Missing getFloatingMessages")
-        assertTrue("setFloatingMessages" in methods, "Missing setFloatingMessages")
-        assertTrue("setFloatingMessagesUpdatedAt" in methods, "Missing setFloatingMessagesUpdatedAt")
-        assertTrue("getFloatingMessagesUpdatedAt" in methods, "Missing getFloatingMessagesUpdatedAt")
-        assertTrue("getWindowX" in methods, "Missing getWindowX")
-        assertTrue("setWindowX" in methods, "Missing setWindowX")
-        assertTrue("getWindowY" in methods, "Missing getWindowY")
-        assertTrue("setWindowY" in methods, "Missing setWindowY")
-        assertTrue("getWindowWidth" in methods, "Missing getWindowWidth")
-        assertTrue("setWindowWidth" in methods, "Missing setWindowWidth")
-        assertTrue("getWindowHeight" in methods, "Missing getWindowHeight")
-        assertTrue("setWindowHeight" in methods, "Missing setWindowHeight")
-        assertTrue("clearFloatingMessages" in methods, "Missing clearFloatingMessages")
-    }
-
-    @Test
-    fun `FloatingChatPreferencesRepository has expected blocking helpers`() {
-        val methods = FloatingChatPreferencesRepository::class.java.declaredMethods.map { it.name }.toSet()
-
-        assertTrue("getFloatingMessagesBlocking" in methods, "Missing getFloatingMessagesBlocking")
-        assertTrue("setFloatingMessagesBlocking" in methods, "Missing setFloatingMessagesBlocking")
-        assertTrue("getFloatingMessagesUpdatedAtBlocking" in methods, "Missing getFloatingMessagesUpdatedAtBlocking")
-        assertTrue("setFloatingMessagesUpdatedAtBlocking" in methods, "Missing setFloatingMessagesUpdatedAtBlocking")
-        assertTrue("clearFloatingMessagesBlocking" in methods, "Missing clearFloatingMessagesBlocking")
-        assertTrue("getWindowXBlocking" in methods, "Missing getWindowXBlocking")
-        assertTrue("setWindowXBlocking" in methods, "Missing setWindowXBlocking")
-        assertTrue("getWindowYBlocking" in methods, "Missing getWindowYBlocking")
-        assertTrue("setWindowYBlocking" in methods, "Missing setWindowYBlocking")
-        assertTrue("getWindowWidthBlocking" in methods, "Missing getWindowWidthBlocking")
-        assertTrue("setWindowWidthBlocking" in methods, "Missing setWindowWidthBlocking")
-        assertTrue("getWindowHeightBlocking" in methods, "Missing getWindowHeightBlocking")
-        assertTrue("setWindowHeightBlocking" in methods, "Missing setWindowHeightBlocking")
-    }
-
-    @Test
-    fun `FloatingChatPreferencesRepository has Flow properties`() {
-        val members = FloatingChatPreferencesRepository::class.members.map { it.name }.toSet()
-
-        assertTrue("floatingMessagesFlow" in members, "Missing floatingMessagesFlow")
-        assertTrue("floatingMessagesUpdatedAtFlow" in members, "Missing floatingMessagesUpdatedAtFlow")
-        assertTrue("windowXFlow" in members, "Missing windowXFlow")
-        assertTrue("windowYFlow" in members, "Missing windowYFlow")
-        assertTrue("windowWidthFlow" in members, "Missing windowWidthFlow")
-        assertTrue("windowHeightFlow" in members, "Missing windowHeightFlow")
-    }
-
-    @Test
-    fun `FloatingChatPreferencesRepository constructor takes Context parameter`() {
-        val constructor = FloatingChatPreferencesRepository::class.java.constructors.first()
-        val paramTypes = constructor.parameterTypes.map { it.simpleName }
-        assertTrue("Context" in paramTypes, "Constructor should take Context, got: $paramTypes")
-    }
-
     // ─── Other repositories exist ────────────────────────────────────────────
 
     @Test
@@ -179,7 +113,6 @@ class DataStoreRepositoryTest {
     fun `all repositories take Context in constructor`() {
         val repos = listOf(
             AppPreferencesRepository::class.java,
-            FloatingChatPreferencesRepository::class.java,
             MainUiPreferencesRepository::class.java,
             VirtualDisplayConfigRepository::class.java,
             ToolPermissionsRepository::class.java,

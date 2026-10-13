@@ -152,7 +152,7 @@
         3. 开发者保留对商业合作方式的最终决定权。未经授权的商业使用将视为违约，开发者保留追究法律责任的权利。
     ]]></string>
     <string name="perm_sheet_title">完成首次设置</string>
-    <string name="perm_sheet_desc">开启以下权限后，语音、悬浮窗和自动化能力才能正常工作。</string>
+    <string name="perm_sheet_desc">开启以下权限后，语音和自动化能力才能正常工作。</string>
     <string name="perm_sheet_shizuku_title">推荐使用 Shizuku 一键配置</string>
     <string name="perm_sheet_shizuku_desc">如果已连接并授权 Shizuku，Aries AI 可以自动补齐无障碍、悬浮窗和麦克风权限。</string>
     <string name="perm_sheet_section_title">必要权限</string>

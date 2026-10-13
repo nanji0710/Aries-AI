@@ -17,12 +17,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.ai.phoneagent.R
 import kotlin.math.abs
 import kotlin.random.Random
+import com.ai.phoneagent.core.designsystem.theme.ariesColorResource
 
 /**
  * 语音波形动画组件
@@ -37,9 +37,9 @@ fun VoiceWaveform(
     val barSpacing = 3.dp
     val maxHeight = 48.dp
     val minHeight = 6.dp
-    val waveStart = colorResource(id = R.color.m3t_voice_wave_start)
-    val waveMid = colorResource(id = R.color.m3t_voice_wave_mid)
-    val waveEnd = colorResource(id = R.color.m3t_voice_wave_end)
+    val waveStart = ariesColorResource(R.color.m3t_voice_wave_start)
+    val waveMid = ariesColorResource(R.color.m3t_voice_wave_mid)
+    val waveEnd = ariesColorResource(R.color.m3t_voice_wave_end)
     
     Row(
         modifier = modifier,

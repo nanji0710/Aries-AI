@@ -19,7 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import com.ai.phoneagent.core.designsystem.theme.AriesSettingsSectionHeader
+import com.ai.phoneagent.core.designsystem.theme.AriesSettingsSection
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
@@ -28,6 +28,9 @@ import com.ai.phoneagent.R
 import com.ai.phoneagent.feature.settings.R as SettingsR
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide
+import androidx.compose.ui.graphics.Color
+import com.ai.phoneagent.core.designsystem.R as DesignR
+import com.ai.phoneagent.core.designsystem.theme.ariesColorResource
 
 private data class License(
     val name: String,
@@ -61,7 +64,7 @@ fun LicensesScreen(navController: NavController) {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(text = stringResource(SettingsR.string.about_open_source_licenses)) },
@@ -75,7 +78,7 @@ fun LicensesScreen(navController: NavController) {
                 },
                 colors =
                     TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
+                        containerColor = ariesColorResource(DesignR.color.m3t_glass_bar),
                     ),
                 modifier = Modifier.statusBarsPadding(),
             )
@@ -86,41 +89,45 @@ fun LicensesScreen(navController: NavController) {
             contentPadding = PaddingValues(horizontal = spacingLg, vertical = spacingLg),
             verticalArrangement = Arrangement.spacedBy(spacingMd),
          ) {
-             items(licenses, key = { it.name }) { item ->
-                 ListItem(
-                     colors =
-                         ListItemDefaults.colors(
-                             containerColor = MaterialTheme.colorScheme.background,
-                         ),
-                     headlineContent = {
-                         Text(
-                             text = item.name,
-                             style = MaterialTheme.typography.titleSmall,
-                             color = MaterialTheme.colorScheme.onSurface,
-                         )
-                     },
-                     supportingContent = {
-                         Text(
-                             text = item.description,
-                             style = MaterialTheme.typography.bodySmall,
-                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                         )
-                     },
-                     trailingContent = {
-                         Surface(
-                             color = MaterialTheme.colorScheme.surfaceVariant,
-                             shape = MaterialTheme.shapes.small,
-                         ) {
-                             Text(
-                                 text = stringResource(R.string.m3t_license_format, item.license),
-                                 style = MaterialTheme.typography.labelSmall,
-                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                 modifier = Modifier.padding(horizontal = spacingSm, vertical = spacingSm),
-                             )
-                         }
-                     },
-                 )
-             }
+            item {
+                AriesSettingsSection(title = stringResource(SettingsR.string.about_open_source_licenses)) {
+                    licenses.forEach { item ->
+                        ListItem(
+                            colors =
+                                ListItemDefaults.colors(
+                                    containerColor = Color.Transparent,
+                                ),
+                            headlineContent = {
+                                Text(
+                                    text = item.name,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            },
+                            supportingContent = {
+                                Text(
+                                    text = item.description,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
+                            trailingContent = {
+                                Surface(
+                                    color = ariesColorResource(DesignR.color.m3t_glass_surface),
+                                    shape = MaterialTheme.shapes.small,
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.m3t_license_format, item.license),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = spacingSm, vertical = spacingSm),
+                                    )
+                                }
+                            },
+                        )
+                    }
+                }
+            }
         }
     }
 }

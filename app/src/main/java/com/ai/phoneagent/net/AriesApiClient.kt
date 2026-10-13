@@ -88,6 +88,23 @@ class AriesApiClient {
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
+            // connect/read 超时都只在「单次 I/O 停顿时」计时，服务器持续慢速滴流数据时
+            // 请求可以无限期存活；callTimeout 是对整个调用的硬上限。
+            .callTimeout(60, TimeUnit.SECONDS)
+            .build()
+    }
+
+    /**
+     * 取模型列表专用的共享客户端。
+     *
+     * 原实现每次调用都 `OkHttpClient.Builder()...build()`，会新建连接池与调度线程且无法复用连接；
+     * 也没有 callTimeout，慢速滴流响应会让「更换模型」长时间没有任何反馈。
+     */
+    private val modelsClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .callTimeout(30, TimeUnit.SECONDS)
             .build()
     }
 
@@ -115,6 +132,7 @@ class AriesApiClient {
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
+            .callTimeout(60, TimeUnit.SECONDS)
             .addInterceptor { chain ->
                 val request = chain.request()
                 val updatedRequest =
@@ -515,10 +533,7 @@ class AriesApiClient {
      */
     suspend fun fetchModels(apiKey: String): Result<List<ModelInfo>> =
         withContext(Dispatchers.IO) {
-            val client = OkHttpClient.Builder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
-                .build()
+            val client = modelsClient
             val request = Request.Builder()
                 .url("$BASE_URL/v1/models")
                 .get()

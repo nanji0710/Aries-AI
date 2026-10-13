@@ -31,8 +31,7 @@ import org.robolectric.annotation.Config
  * [AutomationDispatchAuthenticator] 回归测试。
  *
  * 覆盖 PR-B 阻断项 #4 的修复：纯展示字段 forceTop / keepMain 移出鉴权范围后，
- * 三个内部入口（AutomationOverlay / AutomationLiveNotification /
- * FloatingChatService.navigateToTaskDetail）只附带展示字段时不再被拒绝；
+ * 两个内部入口（AutomationOverlay / AutomationLiveNotification）只附带展示字段时不再被拒绝；
  * 同时确认真正的控制字段 task / autoStart / source 仍需 token，无 token 仍拒绝。
  *
  * 用 Robolectric 提供可工作的 [Intent] 实现；`application = Application::class`

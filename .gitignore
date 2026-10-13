@@ -40,6 +40,9 @@ key/
 *.p12
 *.pem
 *.pfx
+# 本项目公开的默认 release 签名（仅用于自构建/测试，非商店发布密钥）：
+# 见 README「构建与签名」与 SIGNING.md。换生产密钥时请改用 local.properties 覆盖。
+!aries-release.jks
 
 # Packaged build artifacts
 *.aab

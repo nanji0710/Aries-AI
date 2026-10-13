@@ -24,6 +24,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -62,6 +63,12 @@ class AriesApiOAuthActivity : Activity() {
     companion object {
         private const val TAG = "AriesApiOAuth"
         const val EXTRA_AUTH_URL = "extra_auth_url"
+
+        /** 单次 evaluateJavascript 的等待上限：渲染进程无响应时回调可能永不触发。 */
+        private const val JS_EVAL_TIMEOUT_MS = 5_000L
+
+        /** 整个「整理登录结果」阶段的上限，避免 finalizing 永久卡住。 */
+        private const val FINALIZE_TIMEOUT_MS = 120_000L
         var pendingSession: PendingSession? = null
         private const val STORAGE_TOKEN_SCRIPT =
             """
@@ -166,6 +173,7 @@ class AriesApiOAuthActivity : Activity() {
 
     private var completed = false
     private var finalizing = false
+    private var destroyed = false
     private var pendingCallbackUrl: String? = null
     private lateinit var progressOverlay: LinearLayout
     private lateinit var progressScrollView: ScrollView
@@ -264,7 +272,11 @@ class AriesApiOAuthActivity : Activity() {
     }
 
     override fun onDestroy() {
-        if (!completed && !finalizing) {
+        destroyed = true
+        // 无论是否处于 finalizing，都必须把结果交回等待方：
+        // 否则 AriesOidcAuthManager.signIn 里等待登录结果的挂起协程永远不会恢复，
+        // 设置页的「登录」按钮会一直停在加载态（用户观感：点了没反应 / 卡死）。
+        if (!completed && !isChangingConfigurations) {
             finishWith(ApiLoginResult(success = false, message = "Aries API 登录已取消"))
         }
         super.onDestroy()
@@ -293,6 +305,15 @@ class AriesApiOAuthActivity : Activity() {
         finalizing = true
         pendingCallbackUrl = null
         CoroutineScope(Dispatchers.Main).launch {
+            // 看门狗：网络或 WebView 无响应时，finalizing 会永久为 true，
+            // 用户返回设置页后「登录」按钮会一直卡在加载态且无法点击。
+            launch {
+                delay(FINALIZE_TIMEOUT_MS)
+                if (!completed) {
+                    appendProgress("Aries 登录收尾超时，已中止")
+                    finishWith(ApiLoginResult(success = false, message = "Aries 登录收尾超时，请重试"))
+                }
+            }
             appendProgress("回调页已加载，开始整理 Aries 登录结果")
             appendProgress("正在读取 WebView 存储中的登录态")
             val storageResult =
@@ -450,21 +471,23 @@ class AriesApiOAuthActivity : Activity() {
     }
 
     private suspend fun evaluateStorageSnapshot(webView: WebView): String =
-        suspendCancellableCoroutine { continuation ->
-            webView.evaluateJavascript(STORAGE_TOKEN_SCRIPT) { value ->
-                continuation.resume(value.orEmpty())
-            }
-        }
+        evaluateJavascriptValue(webView, STORAGE_TOKEN_SCRIPT)
 
     private suspend fun evaluateJavascriptValue(
         webView: WebView,
         script: String,
     ): String =
-        suspendCancellableCoroutine { continuation ->
-            webView.evaluateJavascript(script) { value ->
-                continuation.resume(value.orEmpty())
+        // evaluateJavascript 的回调在渲染进程无响应时可能永不触发，
+        // 因此这里必须有超时，否则整段登录收尾会永久停在 finalizing。
+        withTimeoutOrNull(JS_EVAL_TIMEOUT_MS) {
+            suspendCancellableCoroutine { continuation ->
+                webView.evaluateJavascript(script) { value ->
+                    if (continuation.isActive) {
+                        continuation.resume(value.orEmpty())
+                    }
+                }
             }
-        }
+        }.orEmpty()
 
     private fun decodeJavascriptString(raw: String): String =
         runCatching { Json.parseToJsonElement(raw).jsonPrimitive.contentOrNull.orEmpty() }
@@ -825,7 +848,7 @@ class AriesApiOAuthActivity : Activity() {
             Log.e(TAG, result.message)
         }
         session?.completion?.invoke(result)
-        finish()
+        if (!destroyed) finish()
     }
 
     private fun showProgressOverlay(message: String) {

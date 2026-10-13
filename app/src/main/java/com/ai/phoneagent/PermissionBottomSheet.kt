@@ -15,6 +15,7 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Mic
 import com.composables.icons.lucide.Smartphone
 import com.composables.icons.lucide.Shield
+import com.ai.phoneagent.core.designsystem.theme.rememberAriesGlassColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,11 +29,13 @@ fun PermissionBottomSheet(
     onDone: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // 底部面板承载权限说明与按钮：用高不透明玻璃底，避免与下层页面文字叠影。
+    val glassColors = rememberAriesGlassColors()
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = glassColors.surfaceStrong,
         shape = MaterialTheme.shapes.extraLarge,
     ) {
         PermissionBottomSheetContent(
@@ -75,7 +78,7 @@ fun PermissionBottomSheetContent(
             fontWeight = FontWeight.SemiBold,
         )
         Surface(
-            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
+            color = MaterialTheme.colorScheme.secondaryContainer,
             shape = MaterialTheme.shapes.large,
         ) {
             Row(
@@ -108,7 +111,7 @@ fun PermissionBottomSheetContent(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = MaterialTheme.shapes.large,
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {

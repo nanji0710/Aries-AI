@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -65,11 +66,11 @@ class ToolPermissionsRepository(
         }
     }
 
-    fun getMasterSwitchBlocking(): String = runBlocking { getMasterSwitch() }
-    fun setMasterSwitchBlocking(value: String) = runBlocking { setMasterSwitch(value) }
-    fun getToolPermissionBlocking(toolName: String): String? = runBlocking { getToolPermission(toolName) }
-    fun setToolPermissionBlocking(toolName: String, value: String) = runBlocking {
+    fun getMasterSwitchBlocking(): String = runBlocking(Dispatchers.IO) { getMasterSwitch() }
+    fun setMasterSwitchBlocking(value: String) = runBlocking(Dispatchers.IO) { setMasterSwitch(value) }
+    fun getToolPermissionBlocking(toolName: String): String? = runBlocking(Dispatchers.IO) { getToolPermission(toolName) }
+    fun setToolPermissionBlocking(toolName: String, value: String) = runBlocking(Dispatchers.IO) {
         setToolPermission(toolName, value)
     }
-    fun removeToolPermissionBlocking(toolName: String) = runBlocking { removeToolPermission(toolName) }
+    fun removeToolPermissionBlocking(toolName: String) = runBlocking(Dispatchers.IO) { removeToolPermission(toolName) }
 }

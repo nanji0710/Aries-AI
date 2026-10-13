@@ -66,10 +66,10 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,6 +88,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ai.phoneagent.R
+import com.ai.phoneagent.core.designsystem.theme.AriesGlassPanel
 import com.ai.phoneagent.helper.AutomationMessageParser
 import com.ai.phoneagent.ui.components.markdown.Markdown
 import com.ai.phoneagent.ui.components.markdown.MarkdownSettings
@@ -107,7 +108,7 @@ private const val STREAMING_MARKDOWN_RENDER_INTERVAL_MS = 80L
 private const val STREAMING_MARKDOWN_MIN_CHUNK_DELTA = 12
 private const val STREAMING_PENDING_INLINE_TAIL_LIMIT = 32
 private const val TRANSCRIPT_EMPTY_SUGGESTION_PAGE_SIZE = 3
-private const val TRANSCRIPT_EMPTY_SUGGESTION_ROTATE_DELAY_MS = 4200L
+private const val TRANSCRIPT_EMPTY_SUGGESTION_ROTATE_DELAY_MS = 5000L
 private val STREAMING_MARKDOWN_ORDERED_LIST_RE = Regex("""(?m)^\s*\d+\.\s""")
 private val STREAMING_MARKDOWN_FENCE_LINE_RE = Regex("""(?m)^[ \t]*`{3,}.*$""")
 private val STREAMING_MARKDOWN_STRUCTURE_RE = Regex(
@@ -435,26 +436,34 @@ fun TranscriptEmptyHintCard(
     val emptyHintCardMaxWidth = dimensionResource(R.dimen.m3t_transcript_empty_card_max_width)
     val suggestionIconSize = spacingLg
     val suggestionArrowSize = dimensionResource(R.dimen.m3t_input_bar_icon_size)
-    val cardElevation = dimensionResource(R.dimen.m3t_message_streaming_tonal_elevation)
     val brandIconSize = appIconSize - spacingXs
-    val suggestions = remember(context) {
-        val suggestionIcons = listOf(
-            Lucide.Search,
-            Lucide.Sparkles,
-            Lucide.MessageCircle,
-        )
+    val suggestionIcons = listOf(
+        Lucide.Search,
+        Lucide.Sparkles,
+        Lucide.MessageCircle,
+    )
+    val allSuggestions = remember(context) {
         context.resources
             .getStringArray(R.array.transcript_suggestion_examples)
             .toList()
-            .take(suggestionIcons.size)
             .mapIndexed { index, prompt ->
                 TranscriptEmptySuggestionItem(
                     label = prompt,
                     prompt = prompt,
-                    icon = suggestionIcons.getOrElse(index) { Lucide.Sparkles },
+                    icon = suggestionIcons.getOrElse(index % suggestionIcons.size) { Lucide.Sparkles },
                 )
             }
     }
+    var visibleSuggestions by remember(context) { mutableStateOf(allSuggestions.shuffled()) }
+    LaunchedEffect(allSuggestions) {
+        while (true) {
+            delay(TRANSCRIPT_EMPTY_SUGGESTION_ROTATE_DELAY_MS)
+            val shuffled = allSuggestions.shuffled()
+            // 相邻轮次避免完全相同的次序，让定时轮换看起来确实有变化。
+            visibleSuggestions = if (shuffled == visibleSuggestions) shuffled.reversed() else shuffled
+        }
+    }
+    val suggestions = visibleSuggestions.take(TRANSCRIPT_EMPTY_SUGGESTION_PAGE_SIZE)
     val suggestionIconColors = listOf(
         MaterialTheme.colorScheme.primary,
         MaterialTheme.colorScheme.tertiary,
@@ -498,17 +507,16 @@ fun TranscriptEmptyHintCard(
             }
         }
 
-        Surface(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.extraLarge,
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = cardElevation,
+            verticalArrangement = Arrangement.spacedBy(spacingSm),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = spacingLg, vertical = spacingLg),
-                verticalArrangement = Arrangement.spacedBy(spacingMd),
+            AriesGlassPanel(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                strong = true,
+                sampleBackdrop = false,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = spacingLg, vertical = spacingMd),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -520,55 +528,63 @@ fun TranscriptEmptyHintCard(
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(suggestionIconSize),
                     )
-                    Text(
-                        text = stringResource(R.string.transcript_empty_suggestion_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(spacingXs)) {
+                        Text(
+                            text = stringResource(R.string.transcript_empty_suggestion_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = stringResource(R.string.transcript_empty_suggestion_subtitle),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
+            }
 
-                Column {
-                    suggestions.forEachIndexed { index, suggestion ->
-                        if (index > 0) {
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        }
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onSuggestionClick(suggestion.prompt) }
-                                .padding(vertical = spacingMd),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(spacingSm),
+            suggestions.forEachIndexed { index, suggestion ->
+                AriesGlassPanel(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSuggestionClick(suggestion.prompt) },
+                    shape = MaterialTheme.shapes.large,
+                    strong = true,
+                    sampleBackdrop = false,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = spacingLg, vertical = spacingMd),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(spacingSm),
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
                         ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                            ) {
-                                Icon(
-                                    imageVector = suggestion.icon,
-                                    contentDescription = null,
-                                    tint = suggestionIconColors[index % suggestionIconColors.size],
-                                    modifier = Modifier.padding(spacingSm).size(suggestionIconSize),
-                                )
-                            }
-
-                            Text(
-                                text = suggestion.label,
-                                modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-
                             Icon(
-                                painter = painterResource(R.drawable.ic_arrow_right),
+                                imageVector = suggestion.icon,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(suggestionArrowSize),
+                                tint = suggestionIconColors[index % suggestionIconColors.size],
+                                modifier = Modifier.padding(spacingSm).size(suggestionIconSize),
                             )
                         }
+
+                        Text(
+                            text = suggestion.label,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+
+                        Icon(
+                            painter = painterResource(R.drawable.ic_arrow_right),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(suggestionArrowSize),
+                        )
                     }
                 }
             }

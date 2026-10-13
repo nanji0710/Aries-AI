@@ -7,6 +7,7 @@ import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -19,6 +20,12 @@ import okhttp3.Request
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
+
+/**
+ * 用户在 Aries 登录页停留的等待上限。超过后 [AriesOidcAuthManager.signIn] 主动失败返回，
+ * 避免设置页的「登录」按钮永久停留在加载态。
+ */
+private const val ARIES_LOGIN_TIMEOUT_MS = 300_000L
 
 /**
  * Aries 通行证 -> Aries API 的两段式 OAuth 登录。
@@ -69,6 +76,8 @@ class AriesOidcAuthManager(
                 .cookieJar(cookieJar)
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
+                // 慢速滴流响应会让后续步骤无限等待；callTimeout 是对整次调用的硬上限。
+                .callTimeout(60, TimeUnit.SECONDS)
                 .build()
         val config =
             withContext(Dispatchers.IO) {
@@ -83,28 +92,34 @@ class AriesOidcAuthManager(
         val authUrl = buildAuthorizationUrl(config)
         val apiLoginResult =
             withContext(Dispatchers.Main) {
-                suspendCancellableCoroutine { continuation ->
-                    AriesApiOAuthActivity.pendingSession =
-                        AriesApiOAuthActivity.PendingSession(
-                            client = client,
-                            callbackApiUrl = "${AriesApiClient.BASE_URL}/api/oauth/oidc",
-                            expectedRedirectUri = config.redirectUri,
-                            initialCookies = cookieJar.loadForUrl(AriesApiClient.BASE_URL).map { it.toString() },
-                            currentCookies = {
-                                cookieJar.loadForUrl(AriesApiClient.BASE_URL).map { "${it.name}=${it.value}" }
-                            },
-                            completion = { result ->
-                                if (continuation.isActive) {
-                                    continuation.resume(result)
-                                }
-                            },
+                withTimeoutOrNull(ARIES_LOGIN_TIMEOUT_MS) {
+                    suspendCancellableCoroutine { continuation ->
+                        AriesApiOAuthActivity.pendingSession =
+                            AriesApiOAuthActivity.PendingSession(
+                                client = client,
+                                callbackApiUrl = "${AriesApiClient.BASE_URL}/api/oauth/oidc",
+                                expectedRedirectUri = config.redirectUri,
+                                initialCookies = cookieJar.loadForUrl(AriesApiClient.BASE_URL).map { it.toString() },
+                                currentCookies = {
+                                    cookieJar.loadForUrl(AriesApiClient.BASE_URL).map { "${it.name}=${it.value}" }
+                                },
+                                completion = { result ->
+                                    if (continuation.isActive) {
+                                        continuation.resume(result)
+                                    }
+                                },
+                            )
+                        activity.startActivity(
+                            Intent(activity, AriesApiOAuthActivity::class.java)
+                                .putExtra(AriesApiOAuthActivity.EXTRA_AUTH_URL, authUrl),
                         )
-                    activity.startActivity(
-                        Intent(activity, AriesApiOAuthActivity::class.java)
-                            .putExtra(AriesApiOAuthActivity.EXTRA_AUTH_URL, authUrl),
-                    )
+                    }
                 }
             }
+        if (apiLoginResult == null) {
+            AriesApiOAuthActivity.pendingSession = null
+            return AuthResult(success = false, message = "Aries 登录超时，请重试")
+        }
         if (!apiLoginResult.success) {
             return AuthResult(success = false, message = apiLoginResult.message)
         }

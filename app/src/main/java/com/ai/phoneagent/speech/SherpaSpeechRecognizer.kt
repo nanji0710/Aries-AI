@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Aries AI - Android UI Automation Framework
  * Copyright (C) 2025-2026 ZG0704666
  *
@@ -51,6 +51,104 @@ class SherpaSpeechRecognizer(private val context: Context) {
     companion object {
         private const val TAG = "SherpaSpeechRecognizer"
         private const val SAMPLE_RATE = 16000
+
+        /** 模型目录名（下载落点与 assets 约定目录一致，见 [SherpaModelRepository]）。 */
+        private const val MODEL_DIR_NAME = SherpaModelRepository.MODEL_DIR_NAME
+
+        /** 运行模型所需的 7 个文件（缺任意一个都无法创建识别器）。 */
+        private val MODEL_FILE_NAMES = SherpaModelRepository.MODEL_FILE_NAMES
+
+        // 候选模型目录（按优先级依次尝试）：
+        // 1. 文档约定的嵌套布局  sherpa-models/<modelDirName>/
+        // 2. legacy 嵌套布局     sherpa-models/models/<modelDirName>/
+        // 3. 平铺布局            sherpa-models/  （模型文件直接放在 sherpa-models/ 根目录下）
+        private val CANDIDATE_ASSET_DIRS =
+                listOf(
+                        "sherpa-models/$MODEL_DIR_NAME",
+                        "sherpa-models/models/$MODEL_DIR_NAME",
+                        "sherpa-models",
+                )
+
+        /** 模型目录准备（校验 + 拷贝）的进程级互斥锁：避免多个识别器实例并发拷贝上百 MB 资源。 */
+        private val modelDirLock = Any()
+    }
+
+    /** 初始化失败原因，用于向用户给出可操作的提示（而不是笼统的「初始化失败」）。 */
+    enum class InitFailure {
+        /** native 库未打进 APK（sherpa-ncnn submodule 未构建）。 */
+        NATIVE_LIBRARY_UNAVAILABLE,
+
+        /** 模型资源未打进 APK（assets/sherpa-models 下缺 7 个模型文件）。 */
+        MODEL_ASSETS_MISSING,
+
+        /** native 库与模型资源都缺（仓库默认状态）。 */
+        NATIVE_LIBRARY_AND_MODEL_ASSETS_MISSING,
+
+        /** 模型未下载（2026-10 起模型移出 APK，需在设置页下载到 filesDir）。 */
+        MODEL_NOT_DOWNLOADED,
+
+        /** 库与资源都在，但引擎创建失败。 */
+        RECOGNIZER_CREATE_FAILED,
+    }
+
+    @Volatile private var initFailure: InitFailure? = null
+
+    /** 上一次初始化失败的原因；初始化成功时为 null。 */
+    fun lastInitFailure(): InitFailure? = initFailure
+
+    /** 上一次失败原因对应的用户可读文案资源 id；成功时为 null。 */
+    fun lastFailureMessageRes(): Int? =
+            when (initFailure) {
+                InitFailure.NATIVE_LIBRARY_UNAVAILABLE ->
+                        com.ai.phoneagent.R.string.speech_model_failure_native_missing
+                InitFailure.MODEL_ASSETS_MISSING ->
+                        com.ai.phoneagent.R.string.speech_model_failure_assets_missing
+                InitFailure.NATIVE_LIBRARY_AND_MODEL_ASSETS_MISSING ->
+                        com.ai.phoneagent.R.string.speech_model_failure_native_and_assets_missing
+                InitFailure.MODEL_NOT_DOWNLOADED ->
+                        com.ai.phoneagent.R.string.speech_model_not_downloaded
+                InitFailure.RECOGNIZER_CREATE_FAILED ->
+                        com.ai.phoneagent.R.string.speech_model_failure_recognizer_create_failed
+                null -> null
+            }
+
+    /**
+     * 只读探测模型资源是否可用（不拷贝、不建目录）：
+     * 1. filesDir 下已缓存的目标目录是否完整（首次运行拷贝成功后即命中）；
+     * 2. APK assets 中任一候选目录是否包含全部 7 个模型文件。
+     */
+    private fun hasModelAssets(): Boolean {
+        val cachedComplete =
+                CANDIDATE_ASSET_DIRS.any { assetDir ->
+                    val dir = File(context.filesDir, assetDir.substringAfterLast('/'))
+                    isModelDirComplete(dir)
+                }
+        if (cachedComplete) return true
+        return CANDIDATE_ASSET_DIRS.any { assetDir ->
+            runCatching {
+                        val entries = context.assets.list(assetDir)?.toSet().orEmpty()
+                        MODEL_FILE_NAMES.all { entries.contains(it) }
+                    }
+                    .getOrDefault(false)
+        }
+    }
+
+    /** 目录是否包含全部模型文件（存在、是文件且非空）。 */
+    private fun isModelDirComplete(dir: File): Boolean {
+        if (!dir.exists()) return false
+        return MODEL_FILE_NAMES.all { name ->
+            val f = File(dir, name)
+            f.exists() && f.isFile && f.length() > 0
+        }
+    }
+
+    /** 目录中缺失的模型文件名列表（目录不存在时返回全部）。 */
+    private fun missingModelFiles(dir: File): List<String> {
+        if (!dir.exists()) return MODEL_FILE_NAMES
+        return MODEL_FILE_NAMES.filterNot { name ->
+            val f = File(dir, name)
+            f.exists() && f.isFile && f.length() > 0
+        }
     }
 
     /** 识别结果回调 */
@@ -106,17 +204,40 @@ class SherpaSpeechRecognizer(private val context: Context) {
         Log.d(TAG, "Initializing sherpa-ncnn...")
         return try {
             withContext(Dispatchers.IO) {
+                initFailure = null
+
+                // 模型已移出 APK（原本占 124.5 MB）：filesDir 未下载、assets 也没打包时，
+                // 直接报告「未下载」，由设置页引导下载，而不是笼统的「初始化失败」。
+                if (!hasModelAssets()) {
+                    initFailure = InitFailure.MODEL_NOT_DOWNLOADED
+                    Log.i(
+                            TAG,
+                            "Speech model is not downloaded yet: " +
+                                    SherpaModelRepository.modelDir(context).absolutePath
+                    )
+                    return@withContext false
+                }
+
                 if (!SherpaNcnn.isNativeLibraryReady()) {
+                    val assetsAvailable = hasModelAssets()
+                    initFailure =
+                            if (assetsAvailable) InitFailure.NATIVE_LIBRARY_UNAVAILABLE
+                            else InitFailure.NATIVE_LIBRARY_AND_MODEL_ASSETS_MISSING
                     Log.e(
                             TAG,
-                            "Sherpa native library is unavailable: ${SherpaNcnn.nativeLibraryErrorMessage()}"
+                            "Sherpa native library is unavailable: " +
+                                    "${SherpaNcnn.nativeLibraryErrorMessage()}; " +
+                                    "modelAssetsAvailable=$assetsAvailable"
                     )
                     return@withContext false
                 }
 
                 val created = createRecognizer()
                 if (!created || recognizer == null) {
-                    Log.e(TAG, "Failed to create sherpa-ncnn recognizer")
+                    if (initFailure == null) {
+                        initFailure = InitFailure.RECOGNIZER_CREATE_FAILED
+                    }
+                    Log.e(TAG, "Failed to create sherpa-ncnn recognizer (reason=${initFailure})")
                     return@withContext false
                 }
 
@@ -125,6 +246,7 @@ class SherpaSpeechRecognizer(private val context: Context) {
                 true
             }
         } catch (e: Exception) {
+            initFailure = InitFailure.RECOGNIZER_CREATE_FAILED
             Log.e(TAG, "Failed to initialize sherpa-ncnn", e)
             false
         }
@@ -190,39 +312,26 @@ class SherpaSpeechRecognizer(private val context: Context) {
     }
 
     private fun createRecognizer(): Boolean {
-        val modelDirName = "sherpa-ncnn-streaming-zipformer-bilingual-zh-en-2023-02-13"
-
-        // 候选模型目录（按优先级依次尝试）：
-        // 1. 文档约定的嵌套布局  sherpa-models/<modelDirName>/
-        // 2. legacy 嵌套布局     sherpa-models/models/<modelDirName>/
-        // 3. 平铺布局            sherpa-models/  （模型文件直接放在 sherpa-models/ 根目录下）
-        val candidateAssetDirs =
-                listOf(
-                        "sherpa-models/$modelDirName",
-                        "sherpa-models/models/$modelDirName",
-                        "sherpa-models"
-                )
-
-        val requiredFiles =
-                listOf(
-                        "encoder_jit_trace-pnnx.ncnn.param",
-                        "encoder_jit_trace-pnnx.ncnn.bin",
-                        "decoder_jit_trace-pnnx.ncnn.param",
-                        "decoder_jit_trace-pnnx.ncnn.bin",
-                        "joiner_jit_trace-pnnx.ncnn.param",
-                        "joiner_jit_trace-pnnx.ncnn.bin",
-                        "tokens.txt",
-                )
+        val requiredFiles = MODEL_FILE_NAMES
 
         val localModelDir =
-                candidateAssetDirs.firstNotNullOfOrNull { assetDir ->
+                CANDIDATE_ASSET_DIRS.firstNotNullOfOrNull { assetDir ->
                     ensureModelDirReady(
                             assetDir = assetDir,
                             targetRootDir = context.filesDir,
                             requiredFiles = requiredFiles
                     )
                 }
-                        ?: return false
+                        ?: run {
+                            initFailure = InitFailure.MODEL_ASSETS_MISSING
+                            Log.e(
+                                    TAG,
+                                    "No complete sherpa model assets found. Expected " +
+                                            "${requiredFiles.joinToString()} under one of " +
+                                            "$CANDIDATE_ASSET_DIRS"
+                            )
+                            return false
+                        }
 
         val featConfig =
                 getFeatureExtractorConfig(sampleRate = SAMPLE_RATE.toFloat(), featureDim = 80)
@@ -296,8 +405,19 @@ class SherpaSpeechRecognizer(private val context: Context) {
             }
         }
 
-        // 如果缓存目录存在但不完整（常见于首次运行中断/拷贝失败），需要删除并重新拷贝
-        if (!isComplete()) {
+        fun missingFiles(): List<String> =
+                requiredFiles.filterNot { name ->
+                    val f = File(targetDir, name)
+                    f.exists() && f.isFile && f.length() > 0
+                }
+
+        if (isComplete()) return targetDir
+
+        synchronized(modelDirLock) {
+            // 双检：并发初始化（MainActivity 与 AutomationViewModel 各持一个实例）时，
+            // 先到的实例可能已经完成拷贝，这里直接复用，避免重复拷贝上百 MB 资源。
+            if (isComplete()) return targetDir
+
             if (targetDir.exists()) {
                 Log.w(
                         TAG,
@@ -305,15 +425,28 @@ class SherpaSpeechRecognizer(private val context: Context) {
                 )
                 runCatching { targetDir.deleteRecursively() }
             }
+
             return try {
                 copyAssetDirRecursive(assetDir, targetDir, overwrite = true)
+                // 关键校验：copyAssetDirRecursive 对「目录里只有 README.md」这类不完整资源不会抛异常，
+                // 若不校验就会把一个缺模型文件的目录当成成功结果交给 native 层，
+                // 失败原因被掩盖成泛化的「引擎创建失败」。
+                if (!isComplete()) {
+                    Log.e(
+                            TAG,
+                            "Model assets copied from '$assetDir' are incomplete. Missing: " +
+                                    "${missingFiles().joinToString()}"
+                    )
+                    runCatching { targetDir.deleteRecursively() }
+                    null
+                } else {
+                    targetDir
+                }
             } catch (e: IOException) {
-                Log.e(TAG, "Failed to copy model assets.", e)
+                Log.e(TAG, "Failed to copy model assets from '$assetDir'.", e)
                 null
             }
         }
-
-        return targetDir
     }
 
     /**

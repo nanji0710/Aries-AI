@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- M3T Dark Palette -->
-    <color name="m3t_primary">#A9C7FF</color>
+    <!-- M3T Dark Palette —— deeper indigo-slate base, bright jicun cobalt accent -->
+    <color name="m3t_primary">#5AA9FF</color>
     <color name="m3t_on_primary">#003061</color>
     <color name="m3t_primary_container">#134782</color>
     <color name="m3t_on_primary_container">#D7E3FF</color>
 
-    <color name="m3t_secondary">#B2C8E8</color>
+    <color name="m3t_secondary">#98C6F2</color>
     <color name="m3t_on_secondary">#1D314A</color>
     <color name="m3t_secondary_container">#334863</color>
     <color name="m3t_on_secondary_container">#D2E4FF</color>
@@ -20,16 +20,16 @@
     <color name="m3t_error_container">#93000A</color>
     <color name="m3t_on_error_container">#FFDAD6</color>
 
-    <color name="m3t_background">#0F141B</color>
-    <color name="m3t_on_background">#E1E7F1</color>
-    <color name="m3t_surface">#121A24</color>
-    <color name="m3t_on_surface">#E1E7F1</color>
-    <color name="m3t_surface_container">#18222E</color>
-    <color name="m3t_surface_container_high">#1F2A37</color>
-    <color name="m3t_surface_variant">#414754</color>
-    <color name="m3t_on_surface_variant">#C1C7D3</color>
-    <color name="m3t_outline">#8B92A0</color>
-    <color name="m3t_outline_variant">#434A56</color>
+    <color name="m3t_background">#111821</color>
+    <color name="m3t_on_background">#F5F7FA</color>
+    <color name="m3t_surface">#171F2A</color>
+    <color name="m3t_on_surface">#F5F7FA</color>
+    <color name="m3t_surface_container">#1D2835</color>
+    <color name="m3t_surface_container_high">#263444</color>
+    <color name="m3t_surface_variant">#354355</color>
+    <color name="m3t_on_surface_variant">#ADB7C5</color>
+    <color name="m3t_outline">#8493A6</color>
+    <color name="m3t_outline_variant">#405064</color>
 
     <color name="m3t_inverse_surface">#E1E7F1</color>
     <color name="m3t_inverse_on_surface">#2A3139</color>
@@ -41,14 +41,22 @@
     <color name="m3t_thinking_text">#F1F6FF</color>
     <color name="m3t_thinking_stroke">#8FB3E4</color>
 
-    <color name="m3t_message_ai_bg">#223247</color>
-    <color name="m3t_message_user_bg">#234067</color>
+    <color name="m3t_message_ai_bg">#1D2835</color>
+    <color name="m3t_message_user_bg">#203B5A</color>
+    <color name="m3t_message_ai_border">#334155</color>
+    <color name="m3t_message_user_border">#52739B</color>
+    <color name="m3t_message_meta_bg">#263444</color>
+    <color name="m3t_message_meta_text">#ADB7C5</color>
     <color name="m3t_message_action">#F0F5FF</color>
     <color name="m3t_message_action_stroke">#66FFFFFF</color>
 
-    <color name="m3t_drawer_background">#152231</color>
-    <color name="m3t_drawer_section_bg">#1A2A3C</color>
-    <color name="m3t_drawer_input_bg">#213247</color>
+    <color name="m3t_drawer_background">#161F2B</color>
+    <color name="m3t_drawer_footer_bg">#1D2835</color>
+    <color name="m3t_drawer_active_item_bg">#234067</color>
+    <color name="m3t_drawer_scrim">#C6000000</color>
+    <color name="m3t_on_floating_header">#F5F7FA</color>
+    <color name="m3t_drawer_section_bg">#1D2835</color>
+    <color name="m3t_drawer_input_bg">#263444</color>
     <color name="m3t_floating_header">#1F2C3B</color>
     <color name="m3t_floating_surface">#141D27</color>
     <color name="m3t_floating_text_secondary">#9FAEC4</color>
@@ -105,5 +113,24 @@
     <color name="m3t_card_border_grad_start">#558BB8EA</color>
     <color name="m3t_card_border_grad_end">#333E6796</color>
     <color name="m3t_circle_glass_bg">#339BCBFF</color>
-
+    <!-- 液态玻璃令牌（深色）：与浅色同名的镜像定义，组件无需分支判断 -->
+    <color name="m3t_glass_surface">#3DFFFFFF</color>
+    <color name="m3t_glass_surface_strong">#F01A2430</color>
+    <color name="m3t_glass_bar">#B51D2835</color>
+    <color name="m3t_glass_border">#40D7E7F7</color>
+    <color name="m3t_glass_border_outline">#4D91A9C2</color>
+    <color name="m3t_glass_highlight">#36FFFFFF</color>
+    <color name="m3t_glass_shadow">#80000000</color>
+    <color name="m3t_glass_scrim">#99060B12</color>
+    <color name="m3t_glass_canvas_start">#FF10151D</color>
+    <color name="m3t_glass_canvas_mid">#FF151F2B</color>
+    <color name="m3t_glass_canvas_end">#FF1B2B3D</color>
+    <color name="m3t_glass_canvas_glow">#26FFFFFF</color>
+    <!--
+        画布彩色光斑（深色）：深底上彩色光晕比浅色更明显，因此 alpha 略高、
+        色相更饱和，让玻璃边缘的折射有可见的内容。
+    -->
+    <color name="m3t_glass_blob_primary">#4A2F83D8</color>
+    <color name="m3t_glass_blob_secondary">#3B238C99</color>
+    <color name="m3t_glass_blob_tertiary">#3A5B4FB8</color>
 </resources>

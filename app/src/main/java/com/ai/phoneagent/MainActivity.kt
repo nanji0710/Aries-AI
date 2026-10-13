@@ -165,7 +165,6 @@ import com.ai.phoneagent.data.local.ConversationStorageRepository
 import com.ai.phoneagent.data.local.StoredAttachmentRecord
 import com.ai.phoneagent.data.local.StoredMessageRecord
 import com.ai.phoneagent.data.preferences.AppPreferencesRepository
-import com.ai.phoneagent.data.preferences.FloatingChatPreferencesRepository
 import com.ai.phoneagent.data.preferences.MainUiPreferencesRepository
 import com.ai.phoneagent.core.designsystem.theme.AriesMaterialTheme
 import com.ai.phoneagent.core.designsystem.theme.ThemeColorStyle
@@ -431,10 +430,8 @@ class MainActivity : AppCompatActivity() {
     private val homeContentAlphaState = mutableStateOf(1f)
     private val homeContentScaleState = mutableStateOf(1f)
     private val showHistoryDialogState = mutableStateOf(false)
-    private lateinit var overlayPermissionLauncher: ActivityResultLauncher<Intent>
 
     private val appPrefsRepository by inject<AppPreferencesRepository>()
-    private val floatingChatPrefs by inject<FloatingChatPreferencesRepository>()
     private val automationInstructionGateway by inject<ActivityAutomationInstructionGateway>()
     private val automationDispatchAuthenticator by inject<AutomationDispatchAuthenticator>()
     private val localMnnInferenceEngine by inject<LocalMnnInferenceEngine>()
@@ -471,12 +468,7 @@ class MainActivity : AppCompatActivity() {
     private var voiceSessionSeed: Long = 0L
     @Volatile private var activeVoiceSessionId: Long = 0L
 
-    // 小窗模式相关
-    private var isAnimatingToMiniWindow = false
-    private val OVERLAY_PERMISSION_REQUEST_CODE = 1234
-    private val NOTIFICATION_PERMISSION_REQUEST_CODE = 1235
     private val CAMERA_PERMISSION_REQUEST_CODE = 1236
-    private var pendingEnterMiniWindowAfterNotifPerm: Boolean = false
     private var pendingAutomationLogUiRefresh: Boolean = false
     private var automationLogReceiverRegistered: Boolean = false
     private var automationTerminatePendingRef: AutomationMessageRef? = null
@@ -677,16 +669,6 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             appPrefs = appPrefsRepository,
         )
-
-        overlayPermissionLauncher =
-            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-                if (Settings.canDrawOverlays(this)) {
-                    Toast.makeText(this, "悬浮窗权限已授予", Toast.LENGTH_SHORT).show()
-                    enterMiniWindowMode()
-                } else {
-                    Toast.makeText(this, "需要悬浮窗权限才能使用小窗模式", Toast.LENGTH_SHORT).show()
-                }
-            }
 
         setContent {
             val themeModeStr by appPrefsRepository.themeModeFlow.collectAsState(initial = "system")
@@ -893,12 +875,6 @@ class MainActivity : AppCompatActivity() {
                 startNewChat(clearUi = true)
             }
         }
-        val onOpenFloatingWindow = remember {
-            {
-                vibrateLight()
-                enterMiniWindowMode()
-            }
-        }
         val onDrawerSearchQueryChange = remember {
             { query: String ->
                 drawerSearchQueryState.value = query
@@ -998,7 +974,6 @@ class MainActivity : AppCompatActivity() {
             onToggleStatus = onToggleStatus,
             onOpenDrawer = onOpenDrawer,
             onNewChat = onNewChat,
-            onOpenFloatingWindow = onOpenFloatingWindow,
             modelName = modelDisplayName,
             drawerSearchQuery = currentDrawerSearchQuery,
             drawerItems = currentDrawerItems,
@@ -1681,7 +1656,6 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
 
-        handleReturnFromFloatingWindow()
         handleAutomationOverlayReturnIntent()
         refreshAutomationCardsForCurrentConversation()
 
@@ -1691,8 +1665,6 @@ class MainActivity : AppCompatActivity() {
         onboardingOverlay.onResume()
 
         // 设置消息同步监听器
-        setupMessageSyncListener()
-
         if (pendingAutomationLogUiRefresh) {
             activeConversation?.let { syncMessageTranscript(it) }
             pendingAutomationLogUiRefresh = false
@@ -1705,7 +1677,6 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        handleReturnFromFloatingWindow()
         handleAutomationOverlayReturnIntent()
         handleAutomationLaunchIntent()
     }
@@ -1714,74 +1685,6 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
         // 不再清除消息同步监听器，保持双向同步
         // 监听器会在 Activity 销毁时自动失效
-    }
-
-    /**
-     * 设置消息同步监听器，用于接收悬浮窗中的新消息
-     */
-    private fun setupMessageSyncListener() {
-        FloatingChatService.setMessageSyncListener(object : FloatingChatService.Companion.MessageSyncListener {
-            override fun onMessageAdded(message: String, isUser: Boolean) {
-                // 在主线程更新 UI
-                runOnUiThread {
-                    val c = requireActiveConversation()
-                    val content =
-                        message
-                            .removePrefix("我: ")
-                            .removePrefix("AI: ")
-                            .removePrefix("Aries: ")
-                            .let { if (isUser) it else stripAutomationMarker(it) }
-                            .trim()
-                    val author = if (isUser) "我" else "Aries AI"
-                    
-                    // 检查是否已存在该消息（避免重复）
-                    val exists = hasEquivalentConversationMessage(c, content, isUser)
-                    if (!exists) {
-                        c.messages.add(UiMessage(author = author, content = content, isUser = isUser))
-                        c.updatedAt = System.currentTimeMillis()
-                        syncMessageTranscript(c)
-                        smoothScrollToBottom()
-                        persistConversations()
-                    }
-                }
-            }
-            
-            override fun onMessagesCleared() {
-                runOnUiThread {
-                    resetAutomationPanelRuntimeState()
-                    clearStreamingTranscript()
-                    syncMessageTranscript()
-                }
-            }
-        })
-    }
-    
-    /**
-     * 处理从悬浮窗返回的动画和消息同步
-     */
-    private fun handleReturnFromFloatingWindow() {
-        val fromFloating = intent?.getBooleanExtra("from_floating", false) ?: false
-        if (!fromFloating) return
-        
-        // 清除标志避免重复触发
-        intent?.removeExtra("from_floating")
-        
-        runCatching {
-            sendBroadcast(
-                Intent(FloatingChatService.ACTION_FLOATING_RETURNED).setPackage(packageName)
-            )
-        }
-
-        // 【减轻闪动】禁用过渡动画，并用轻微淡入接管首帧观感
-        runCatching { overridePendingTransition(0, 0) }
-        homeContentAlphaState.value = 0.92f
-        lifecycleScope.launch {
-            delay(120)
-            homeContentAlphaState.value = 1f
-        }
-
-        // 同步悬浮窗中的消息到主界面
-        syncMessagesFromFloatingWindow()
     }
 
     private fun handleAutomationOverlayReturnIntent() {
@@ -1823,72 +1726,6 @@ class MainActivity : AppCompatActivity() {
         target.removeExtra(AutomationViewModel.EXTRA_AUTOMATION_DISPATCH_TOKEN)
     }
     
-    /**
-     * 从悬浮窗同步消息到主界面
-     */
-    private fun syncMessagesFromFloatingWindow() {
-        val c = requireActiveConversation()
-        var floatingMessages: List<String>? = null
-
-        // 首先尝试从运行中的服务获取消息
-        val floatingService = FloatingChatService.getInstance()
-        if (floatingService != null) {
-            floatingMessages = floatingService.getMessages()
-        }
-
-        // 如果服务未运行，从本地持久化恢复消息
-        if (floatingMessages == null || floatingMessages.isEmpty()) {
-            try {
-                val json = floatingChatPrefs.getFloatingMessagesBlocking()
-                if (json != null) {
-                    val type = object : com.google.gson.reflect.TypeToken<List<String>>() {}.type
-                    floatingMessages = com.google.gson.Gson().fromJson(json, type) ?: emptyList()
-                }
-            } catch (e: Exception) {
-                floatingMessages = emptyList()
-            }
-        }
-
-        if (floatingMessages?.isEmpty() != false) return
-
-        // 解析悬浮窗消息并添加到当前对话
-        for (msg in floatingMessages.orEmpty()) {
-            val isUser = msg.startsWith("我:") || msg.startsWith("我: ")
-            val content =
-                msg.removePrefix("我: ")
-                    .removePrefix("我:")
-                    .removePrefix("Aries: ")
-                    .removePrefix("Aries:")
-                    .removePrefix("AI: ")
-                    .removePrefix("AI:")
-                    .let { if (isUser) it else stripAutomationMarker(it) }
-                    .trim()
-
-            // 跳过空消息和"思考中"消息
-            if (content.isBlank() || content == "思考中...") continue
-
-            // 检查是否已存在该消息
-            val exists = hasEquivalentConversationMessage(c, content, isUser)
-            if (!exists) {
-                val author = if (isUser) "我" else "Aries AI"
-                c.messages.add(UiMessage(author = author, content = content, isUser = isUser))
-            }
-        }
-
-        c.updatedAt = System.currentTimeMillis()
-
-        // 重新渲染对话
-        renderConversation(c)
-        persistConversations()
-
-        // 清空浮窗消息存储（已同步完成）
-        try {
-            floatingChatPrefs.clearFloatingMessagesBlocking()
-        } catch (e: Exception) {
-            // ignore
-        }
-    }
-
     private fun registerAutomationLogReceiverIfNeeded() {
         if (automationLogReceiverRegistered) return
         val filter = IntentFilter(AutomationLogBridge.ACTION_AUTOMATION_LOG)
@@ -2374,118 +2211,6 @@ class MainActivity : AppCompatActivity() {
         return AutomationReadyState(false, reason)
     }
     
-    /**
-     * 进入小窗模式
-     */
-    private fun enterMiniWindowMode() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val notifGranted =
-                    ContextCompat.checkSelfPermission(
-                            this,
-                            Manifest.permission.POST_NOTIFICATIONS
-                    ) == PackageManager.PERMISSION_GRANTED
-            if (!notifGranted) {
-                pendingEnterMiniWindowAfterNotifPerm = true
-                ActivityCompat.requestPermissions(
-                        this,
-                        arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                        NOTIFICATION_PERMISSION_REQUEST_CODE
-                )
-                return
-            }
-        }
-
-        // 检查悬浮窗权限
-        if (!Settings.canDrawOverlays(this)) {
-            Toast.makeText(this, "请授予悬浮窗权限", Toast.LENGTH_SHORT).show()
-            val intent = Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:$packageName")
-            )
-            overlayPermissionLauncher.launch(intent)
-            return
-        }
-        
-        if (isAnimatingToMiniWindow) return
-        isAnimatingToMiniWindow = true
-        
-        hideKeyboard()
-        
-        // 播放缩小动画并启动悬浮窗
-        playCollapseToMiniWindowAnimation()
-    }
-    
-    /**
-     * 缩小到小窗的动画 - 类似微信语音通话缩小效果，一步到位
-     * 使用非线性弹性曲线，平滑过渡到目标位置
-     */
-    private fun playCollapseToMiniWindowAnimation() {
-        val displayMetrics = resources.displayMetrics
-        val density = displayMetrics.density
-        
-        // 目标小窗尺寸和位置
-        val miniWindowWidth = 280 * density
-        val miniWindowHeight = 360 * density
-
-        val fallbackX = ((displayMetrics.widthPixels - miniWindowWidth) / 2f).toInt()
-        val fallbackY = ((displayMetrics.heightPixels - miniWindowHeight) / 2f).toInt()
-        val savedX = floatingChatPrefs.getWindowXBlocking()
-        val savedY = floatingChatPrefs.getWindowYBlocking()
-        val targetX = (savedX.takeIf { it >= 0 } ?: fallbackX).toFloat()
-        val targetY = (savedY.takeIf { it >= 0 } ?: fallbackY).toFloat()
-        
-        // 仅保留近期消息，避免历史过大导致小窗启动异常
-        val messagesList = ArrayList<String>()
-        activeConversation?.messages?.takeLast(120)?.forEach { msg ->
-            val sanitizedContent =
-                if (msg.isUser) {
-                    msg.content.trim()
-                } else {
-                    stripAutomationMarker(msg.content).trim()
-                }
-            if (sanitizedContent.isNotBlank()) {
-                messagesList.add("${if (msg.isUser) "我" else "Aries"}: $sanitizedContent")
-            }
-        }
-
-        val startOk = runCatching {
-            FloatingChatService.cacheMessagesForNextStart(this@MainActivity, messagesList)
-            // 消息从本地缓存恢复，避免通过 Intent 传长列表触发崩溃
-            FloatingChatService.start(
-                this@MainActivity,
-                messages = null,
-                fromX = targetX,
-                fromY = targetY,
-                fromWidth = miniWindowWidth,
-                fromHeight = miniWindowHeight,
-                showDelayMs = 120L,
-            )
-            true
-        }.getOrElse {
-            Toast.makeText(this, "小窗启动失败，请重试", Toast.LENGTH_SHORT).show()
-            false
-        }
-        if (!startOk) {
-            isAnimatingToMiniWindow = false
-            return
-        }
-
-        isAnimatingToMiniWindow = false
-
-        runCatching {
-            homeContentAlphaState.value = 0.85f
-            homeContentScaleState.value = 0.985f
-            lifecycleScope.launch {
-                delay(140)
-                moveTaskToBack(true)
-                homeContentAlphaState.value = 1f
-                homeContentScaleState.value = 1f
-            }
-        }.recoverCatching {
-            moveTaskToBack(true)
-        }
-    }
-    
     override fun onRequestPermissionsResult(
             requestCode: Int,
             permissions: Array<out String>,
@@ -2512,19 +2237,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
-            val granted =
-                    grantResults.isNotEmpty() &&
-                            grantResults[0] == PackageManager.PERMISSION_GRANTED
-            if (pendingEnterMiniWindowAfterNotifPerm && granted) {
-                pendingEnterMiniWindowAfterNotifPerm = false
-                enterMiniWindowMode()
-            } else {
-                pendingEnterMiniWindowAfterNotifPerm = false
-                Toast.makeText(this, "需要通知权限以显示小窗运行通知", Toast.LENGTH_SHORT).show()
-            }
-        }
-        
         if (requestCode == CAMERA_PERMISSION_REQUEST_CODE) {
             val granted =
                     grantResults.isNotEmpty() &&
@@ -3403,11 +3115,6 @@ class MainActivity : AppCompatActivity() {
                 syncMessageTranscript(c)
                 persistConversations()
                 smoothScrollToBottom()
-                
-                // 同步消息到悬浮窗（如果运行中）
-                if (FloatingChatService.isRunning()) {
-                    FloatingChatService.getInstance()?.addMessage("我: $messageContentStr", isUser = true)
-                }
 
                 inputTextState.value = ""
                 
@@ -3441,7 +3148,6 @@ class MainActivity : AppCompatActivity() {
                 val streamBufferLock = Any()
                 val streamUiScheduleLock = Any()
                 var pendingStreamUiUpdate: Job? = null
-                var floatingStreamStarted = false
 
                 fun flushStreamingTranscriptUi() {
                     val (reasoningSnapshot, contentSnapshot) =
@@ -3508,11 +3214,6 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                if (FloatingChatService.isRunning()) {
-                    FloatingChatService.getInstance()?.beginExternalStreamAiReply()
-                    floatingStreamStarted = true
-                }
-
                 // 构建对话历史
                 val chatHistory = buildChatHistory(c, retryMode).toMutableList()
                 if (resendUser) {
@@ -3557,9 +3258,6 @@ class MainActivity : AppCompatActivity() {
                                 answer = "",
                             )
                         }
-                        if (FloatingChatService.isRunning()) {
-                            FloatingChatService.getInstance()?.resetExternalStreamAiReply()
-                        }
                     }
 
                     val reasoningDeltaHandler: (String) -> Unit = { delta ->
@@ -3570,10 +3268,6 @@ class MainActivity : AppCompatActivity() {
                                 reasoningSb.append(delta)
                             }
                             requestStreamingTranscriptUiUpdate()
-                            if (FloatingChatService.isRunning()) {
-                                FloatingChatService.getInstance()
-                                    ?.appendExternalReasoningDelta(delta)
-                            }
                         }
                     }
 
@@ -3585,12 +3279,6 @@ class MainActivity : AppCompatActivity() {
                                 contentSb.append(delta)
                             }
                             requestStreamingTranscriptUiUpdate()
-
-                            // 同步到悬浮窗
-                            if (FloatingChatService.isRunning()) {
-                                FloatingChatService.getInstance()
-                                    ?.appendExternalContentDelta(delta)
-                            }
                         }
                     }
 
@@ -3643,11 +3331,6 @@ class MainActivity : AppCompatActivity() {
                         } else {
                             formatChatRequestFailure(lastError)
                         }
-
-                if (floatingStreamStarted && FloatingChatService.isRunning()) {
-                    FloatingChatService.getInstance()
-                            ?.finishExternalStreamAiReply(timeCost.toInt(), finalContent)
-                }
 
                 val parsedPersisted = parseStoredAiContent(finalContent)
                 val thinkingContent =
@@ -4687,9 +4370,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
 
         super.onDestroy()
-        
-        // 清除消息同步监听器，防止内存泄漏
-        FloatingChatService.setMessageSyncListener(null)
+
         unregisterAutomationLogReceiverIfNeeded()
         unregisterQwenDownloadReceiverIfNeeded()
 

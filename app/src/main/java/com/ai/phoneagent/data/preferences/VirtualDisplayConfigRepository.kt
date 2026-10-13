@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -138,18 +139,18 @@ class VirtualDisplayConfigRepository(
         return prefs[Keys.autoApproveAutomation] ?: true
     }
 
-    fun getResolutionPresetBlocking(): String = runBlocking { getResolutionPreset() }
-    fun setResolutionPresetBlocking(value: String) = runBlocking { setResolutionPreset(value) }
-    fun getVirtualDisplayDpiBlocking(): Int = runBlocking { getVirtualDisplayDpi() }
-    fun setVirtualDisplayDpiBlocking(value: Int) = runBlocking { setVirtualDisplayDpi(value) }
-    fun getVirtualDisplayWidthBlocking(): Int = runBlocking { getVirtualDisplayWidth() }
-    fun setVirtualDisplayWidthBlocking(value: Int) = runBlocking { setVirtualDisplayWidth(value) }
-    fun getVirtualDisplayHeightBlocking(): Int = runBlocking { getVirtualDisplayHeight() }
-    fun setVirtualDisplayHeightBlocking(value: Int) = runBlocking { setVirtualDisplayHeight(value) }
-    fun getUseVirtualDisplayBlocking(): Boolean = runBlocking { getUseVirtualDisplay() }
-    fun setUseVirtualDisplayBlocking(value: Boolean) = runBlocking { setUseVirtualDisplay(value) }
-    fun getUseShizukuInteractionBlocking(): Boolean = runBlocking { getUseShizukuInteraction() }
-    fun setUseShizukuInteractionBlocking(value: Boolean) = runBlocking { setUseShizukuInteraction(value) }
-    fun getAutoApproveAutomationBlocking(): Boolean = runBlocking { getAutoApproveAutomation() }
-    fun setAutoApproveAutomationBlocking(value: Boolean) = runBlocking { setAutoApproveAutomation(value) }
+    fun getResolutionPresetBlocking(): String = runBlocking(Dispatchers.IO) { getResolutionPreset() }
+    fun setResolutionPresetBlocking(value: String) = runBlocking(Dispatchers.IO) { setResolutionPreset(value) }
+    fun getVirtualDisplayDpiBlocking(): Int = runBlocking(Dispatchers.IO) { getVirtualDisplayDpi() }
+    fun setVirtualDisplayDpiBlocking(value: Int) = runBlocking(Dispatchers.IO) { setVirtualDisplayDpi(value) }
+    fun getVirtualDisplayWidthBlocking(): Int = runBlocking(Dispatchers.IO) { getVirtualDisplayWidth() }
+    fun setVirtualDisplayWidthBlocking(value: Int) = runBlocking(Dispatchers.IO) { setVirtualDisplayWidth(value) }
+    fun getVirtualDisplayHeightBlocking(): Int = runBlocking(Dispatchers.IO) { getVirtualDisplayHeight() }
+    fun setVirtualDisplayHeightBlocking(value: Int) = runBlocking(Dispatchers.IO) { setVirtualDisplayHeight(value) }
+    fun getUseVirtualDisplayBlocking(): Boolean = runBlocking(Dispatchers.IO) { getUseVirtualDisplay() }
+    fun setUseVirtualDisplayBlocking(value: Boolean) = runBlocking(Dispatchers.IO) { setUseVirtualDisplay(value) }
+    fun getUseShizukuInteractionBlocking(): Boolean = runBlocking(Dispatchers.IO) { getUseShizukuInteraction() }
+    fun setUseShizukuInteractionBlocking(value: Boolean) = runBlocking(Dispatchers.IO) { setUseShizukuInteraction(value) }
+    fun getAutoApproveAutomationBlocking(): Boolean = runBlocking(Dispatchers.IO) { getAutoApproveAutomation() }
+    fun setAutoApproveAutomationBlocking(value: Boolean) = runBlocking(Dispatchers.IO) { setAutoApproveAutomation(value) }
 }

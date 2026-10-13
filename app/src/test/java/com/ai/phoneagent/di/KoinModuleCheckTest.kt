@@ -24,7 +24,6 @@ import com.ai.phoneagent.data.local.AriesDatabase
 import com.ai.phoneagent.data.local.ConversationDao
 import com.ai.phoneagent.data.preferences.AppPreferencesRepository
 import com.ai.phoneagent.data.preferences.AutomationResultsRepository
-import com.ai.phoneagent.data.preferences.FloatingChatPreferencesRepository
 import com.ai.phoneagent.data.preferences.MainUiPreferencesRepository
 import com.ai.phoneagent.data.preferences.ToolPermissionsRepository
 import com.ai.phoneagent.data.preferences.VirtualDisplayConfigRepository
@@ -95,7 +94,6 @@ class KoinModuleCheckTest : KoinTest {
             single<SecretStore> { mockk(relaxed = true) }
             single { AppPreferencesRepository(get(), get()) }
             single { MainUiPreferencesRepository(get()) }
-            single { FloatingChatPreferencesRepository(get()) }
             single { VirtualDisplayConfigRepository(get()) }
             single { ToolPermissionsRepository(get()) }
             single { AutomationResultsRepository(get()) }

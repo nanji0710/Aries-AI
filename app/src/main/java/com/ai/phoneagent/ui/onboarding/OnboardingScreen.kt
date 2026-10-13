@@ -36,8 +36,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import com.ai.phoneagent.core.designsystem.theme.AriesGlassPanel
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -85,6 +84,9 @@ import com.composables.icons.lucide.Shield
 import com.composables.icons.lucide.Smartphone
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import androidx.compose.ui.graphics.Color
+import com.ai.phoneagent.core.designsystem.R as DesignR
+import com.ai.phoneagent.core.designsystem.theme.ariesColorResource
 
 private const val FLOW_ONBOARDING = "onboarding"
 private const val FLOW_VIEW_ONLY = "view_only"
@@ -220,7 +222,7 @@ fun OnboardingScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = {
@@ -245,7 +247,7 @@ fun OnboardingScreen(
                 },
                 colors =
                     TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
+                        containerColor = ariesColorResource(DesignR.color.m3t_glass_bar),
                     ),
                 modifier = Modifier.statusBarsPadding(),
             )
@@ -372,13 +374,14 @@ private fun WelcomePanel(
     val spacingXl = dimensionResource(R.dimen.m3t_spacing_xl)
     val buttonHeight = dimensionResource(R.dimen.m3t_button_height)
 
-    Card(
+    AriesGlassPanel(
         modifier = Modifier.fillMaxSize().padding(horizontal = spacingXl, vertical = spacingLg),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = MaterialTheme.shapes.extraLarge,
+        strong = true,
+        contentPadding = PaddingValues(spacingLg),
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(spacingLg),
+            modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(
@@ -422,13 +425,14 @@ private fun AgreementPanel(
     val agreementTextColor = MaterialTheme.colorScheme.onSurface.toArgb()
     val agreementContainerColor = MaterialTheme.colorScheme.surfaceVariant.toArgb()
 
-    Card(
+    AriesGlassPanel(
         modifier = Modifier.fillMaxSize().padding(horizontal = spacingXl, vertical = spacingLg),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = MaterialTheme.shapes.extraLarge,
+        strong = true,
+        contentPadding = PaddingValues(spacingLg),
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(spacingLg),
+            modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(spacingMd),
         ) {
             Text(
@@ -505,15 +509,16 @@ private fun PermissionPanel(
     val spacingXl = dimensionResource(R.dimen.m3t_spacing_xl)
     val buttonHeight = dimensionResource(R.dimen.m3t_button_height)
     val compactButtonHeight = dimensionResource(R.dimen.m3t_compact_button_height)
-
-    Card(
+    // 权限卡承载正文与操作按钮，使用高不透明玻璃底以保持阅读对比度。
+    AriesGlassPanel(
         modifier = Modifier.fillMaxSize().padding(horizontal = spacingXl, vertical = spacingLg),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = MaterialTheme.shapes.extraLarge,
+        strong = true,
+        contentPadding = PaddingValues(spacingLg),
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(spacingLg),
+            contentPadding = PaddingValues(),
             verticalArrangement = Arrangement.spacedBy(spacingMd),
         ) {
             item {
@@ -567,13 +572,11 @@ private fun PermissionPanel(
             }
 
             item {
-                Card(
+                AriesGlassPanel(
                     modifier = Modifier.fillMaxWidth(),
-                    colors =
-                        CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
-                        ),
                     shape = MaterialTheme.shapes.large,
+                    strong = true,
+                    sampleBackdrop = false,
                 ) {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         PermissionRow(

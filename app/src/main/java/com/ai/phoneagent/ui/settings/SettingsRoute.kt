@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
@@ -61,6 +63,9 @@ import com.ai.phoneagent.viewmodel.AboutViewModel
 import com.ai.phoneagent.viewmodel.AutomationViewModel
 import com.ai.phoneagent.viewmodel.SettingsViewModel
 import com.ai.phoneagent.core.designsystem.R as DesignR
+import com.ai.phoneagent.core.designsystem.theme.ariesGlassBorder
+import com.ai.phoneagent.core.designsystem.theme.rememberAriesGlassColors
+import com.ai.phoneagent.core.designsystem.theme.rememberAriesGlassPanelShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import kotlinx.coroutines.launch
@@ -89,8 +94,13 @@ fun SettingsRoute(
         val observer =
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
+                    // 只刷新本地模型就绪态。这里原本还会调用 restoreSettings()，
+                    // 它会在主线程做约 12 次 runBlocking DataStore 读（含 AndroidKeyStore 解密），
+                    // 并且会把用户正在输入/粘贴的 API Key 覆盖掉；
+                    // init 阶段已经执行过一次 restoreSettings()，此处属于重复劳动。
                     viewModel.refreshLocalModelState()
-                    viewModel.restoreSettings()
+                    // 离线语音模型（已移出 APK）可能在别处下载完成，回到设置页时重新校验
+                    viewModel.refreshSpeechModelState()
                 }
             }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -136,7 +146,6 @@ fun SettingsRoute(
                     onOpenAppearance = { viewModel.navigateTo(SettingsViewModel.SettingsPage.Appearance) },
                     onOpenModelApi = { viewModel.openModelApiPage() },
                     onOpenAutomation = { navController.navigate(Routes.Automation.route) },
-                    onOpenAbout = { viewModel.navigateTo(SettingsViewModel.SettingsPage.About) },
                 )
             }
 
@@ -150,10 +159,17 @@ fun SettingsRoute(
                     apiStatusPositive = viewModel.apiStatusPositive,
                     qwenButtonText = viewModel.qwenButtonText,
                     qwenButtonEnabled = viewModel.qwenButtonEnabled,
+                    speechButtonText = viewModel.speechButtonText,
+                    speechButtonEnabled = viewModel.speechButtonEnabled,
+                    speechModelReady = viewModel.speechModelReady,
                     showAriesApiSection = viewModel.showAriesApiSection,
                     ariesLoggedInUser = viewModel.ariesLoggedInUser,
                     ariesSelectedModel = viewModel.ariesSelectedModel,
-                    onChangeAriesModel = { viewModel.openAriesModelSelectionDialog() },
+                    onChangeAriesModel = {
+                        viewModel.openAriesModelSelectionDialog { message ->
+                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                        }
+                    },
                     onBack = { viewModel.openHomePage() },
                     onApiModeChange = { mode ->
                         viewModel.onApiModeChange(mode) { message ->
@@ -191,27 +207,89 @@ fun SettingsRoute(
                             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                         }
                     },
+                    onDownloadSpeechModel = {
+                        viewModel.enqueueSpeechModelDownload { message ->
+                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                        }
+                    },
                 )
                 // Aries 模型选择对话框
                 if (viewModel.showAriesModelDialog) {
+                    // 液态玻璃弹窗：高不透明玻璃底（保证模型名可读）+ 发丝描边 + 连续曲率圆角，
+                    // 对话框是独立窗口，半透明底会自然透出下层被 dim 的页面（对应 LootArchive LiquidDialog）。
+                    val glassColors = rememberAriesGlassColors()
+                    val glassPanelShape = rememberAriesGlassPanelShape()
+                    val glassBorderWidth = dimensionResource(DesignR.dimen.m3t_glass_border_width)
                     AlertDialog(
                         onDismissRequest = { viewModel.dismissAriesModelDialog() },
+                        // 用自绘描边代替 `Modifier.border`：泛型形状（超椭圆）会让 Compose 去建
+                        // 位图缓存，对话框首帧尺寸退化时会抛 IllegalArgumentException 直接闪退。
+                        modifier = Modifier.ariesGlassBorder(
+                            shape = glassPanelShape,
+                            color = glassColors.border,
+                            width = glassBorderWidth,
+                        ),
+                        shape = glassPanelShape,
+                        containerColor = glassColors.surfaceStrong,
                         title = { Text(stringResource(com.ai.phoneagent.R.string.aries_model_select_title)) },
                         text = {
-                            LazyColumn {
-                                items(viewModel.ariesAvailableModels) { model ->
-                                    Text(
-                                        text = model.id,
-                                        style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { viewModel.selectAriesModel(model.id) }
-                                            .then(
-                                                Modifier.height(
-                                                    dimensionResource(DesignR.dimen.m3t_compact_button_height)
-                                                )
+                            when {
+                                viewModel.ariesModelLoading -> {
+                                    Column {
+                                        CircularProgressIndicator(
+                                            modifier =
+                                                Modifier.size(
+                                                    dimensionResource(DesignR.dimen.m3t_onboarding_loading_indicator_size)
+                                                ),
+                                        )
+                                        Spacer(Modifier.height(dimensionResource(DesignR.dimen.m3t_spacing_sm)))
+                                        Text(
+                                            text = stringResource(com.ai.phoneagent.R.string.aries_model_loading),
+                                            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                                        )
+                                    }
+                                }
+                                viewModel.ariesModelError != null -> {
+                                    Column {
+                                        Text(
+                                            text = viewModel.ariesModelError.orEmpty(),
+                                            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                                        )
+                                        Spacer(Modifier.height(dimensionResource(DesignR.dimen.m3t_spacing_sm)))
+                                        TextButton(
+                                            onClick = {
+                                                viewModel.retryAriesModelSelection { message ->
+                                                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                                }
+                                            },
+                                        ) {
+                                            Text(stringResource(com.ai.phoneagent.R.string.aries_model_retry))
+                                        }
+                                    }
+                                }
+                                else -> {
+                                    LazyColumn(
+                                        modifier =
+                                            Modifier.heightIn(
+                                                max = dimensionResource(DesignR.dimen.m3t_model_list_height)
                                             ),
-                                    )
+                                    ) {
+                                        items(viewModel.ariesAvailableModels) { model ->
+                                            Text(
+                                                text = model.id,
+                                                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                                                modifier =
+                                                    Modifier
+                                                        .fillMaxWidth()
+                                                        .clickable { viewModel.selectAriesModel(model.id) }
+                                                        .then(
+                                                            Modifier.height(
+                                                                dimensionResource(DesignR.dimen.m3t_compact_button_height)
+                                                            )
+                                                        ),
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         },

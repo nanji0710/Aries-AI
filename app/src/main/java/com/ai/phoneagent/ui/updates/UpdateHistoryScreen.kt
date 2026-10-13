@@ -25,8 +25,7 @@ import com.composables.icons.lucide.Download
 import com.composables.icons.lucide.ExternalLink
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import com.ai.phoneagent.core.designsystem.theme.AriesGlassPanel
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -56,6 +55,9 @@ import com.ai.phoneagent.feature.updates.R
 import com.ai.phoneagent.updates.ReleaseEntry
 import com.ai.phoneagent.viewmodel.UpdateHistoryViewModel
 import org.koin.androidx.compose.koinViewModel
+import androidx.compose.ui.graphics.Color
+import com.ai.phoneagent.core.designsystem.R as DesignR
+import com.ai.phoneagent.core.designsystem.theme.ariesColorResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,7 +73,7 @@ fun UpdateHistoryScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(text = stringResource(R.string.m3t_updates_title)) },
@@ -84,7 +86,7 @@ fun UpdateHistoryScreen(
                      }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = ariesColorResource(DesignR.color.m3t_glass_bar),
                 ),
                 modifier = Modifier.statusBarsPadding(),
             )
@@ -247,12 +249,16 @@ private fun ReleaseItemCard(
     val spacingSm = dimensionResource(DesignSystemR.dimen.m3t_spacing_sm)
     val spacingMd = dimensionResource(DesignSystemR.dimen.m3t_spacing_md)
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = MaterialTheme.shapes.large,
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
+    Box(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
     ) {
-        Column(modifier = Modifier.padding(spacingMd)) {
+        AriesGlassPanel(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            elevated = true,
+            contentPadding = PaddingValues(spacingMd),
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -316,5 +322,6 @@ private fun ReleaseItemCard(
                 }
             }
         }
+    }
     }
 }

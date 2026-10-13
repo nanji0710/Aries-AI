@@ -33,6 +33,7 @@ import androidx.core.graphics.ColorUtils
 import com.ai.phoneagent.core.utils.DisplayUtils
 import com.ai.phoneagent.system.startActivityWithMaterialForwardTransition
 import com.ai.phoneagent.viewmodel.AutomationViewModel
+import com.ai.phoneagent.system.AriesThemeNightModeSync
 
 class AutomationOverlay(
     private val liveNotification: AutomationLiveNotification,
@@ -493,11 +494,11 @@ class AutomationOverlay(
         private val title = TextView(context)
         private val subtitle = TextView(context)
         private val detail = TextView(context)
-        private val surfaceColor = ContextCompat.getColor(context, R.color.m3t_floating_surface)
-        private val outlineColor = ContextCompat.getColor(context, R.color.m3t_outline_variant)
-        private val titleColor = ContextCompat.getColor(context, R.color.m3t_on_surface)
-        private val subtitleColor = ContextCompat.getColor(context, R.color.m3t_primary)
-        private val detailColor = ContextCompat.getColor(context, R.color.m3t_on_surface_variant)
+        private val surfaceColor = AriesThemeNightModeSync.resolveColor(context, R.color.m3t_floating_surface)
+        private val outlineColor = AriesThemeNightModeSync.resolveColor(context, R.color.m3t_outline_variant)
+        private val titleColor = AriesThemeNightModeSync.resolveColor(context, R.color.m3t_on_surface)
+        private val subtitleColor = AriesThemeNightModeSync.resolveColor(context, R.color.m3t_primary)
+        private val detailColor = AriesThemeNightModeSync.resolveColor(context, R.color.m3t_on_surface_variant)
 
         private var lp: WindowManager.LayoutParams? = null
         private var wm: WindowManager? = null
@@ -677,13 +678,13 @@ class AutomationOverlay(
 
     private class EdgeFlowView(context: Context) : View(context) {
 
-        private val colorPrimary = ContextCompat.getColor(context, R.color.m3t_primary)
-        private val colorPrimaryContainer = ContextCompat.getColor(context, R.color.m3t_primary_container)
-        private val colorSecondaryContainer = ContextCompat.getColor(context, R.color.m3t_secondary_container)
-        private val colorSuccess = ContextCompat.getColor(context, R.color.m3t_success)
-        private val colorSuccessContainer = ContextCompat.getColor(context, R.color.m3t_dialog_surface_alt)
-        private val colorSurface = ContextCompat.getColor(context, R.color.m3t_surface)
-        private val colorOnSurface = ContextCompat.getColor(context, R.color.m3t_on_surface)
+        private val colorPrimary = AriesThemeNightModeSync.resolveColor(context, R.color.m3t_primary)
+        private val colorPrimaryContainer = AriesThemeNightModeSync.resolveColor(context, R.color.m3t_primary_container)
+        private val colorSecondaryContainer = AriesThemeNightModeSync.resolveColor(context, R.color.m3t_secondary_container)
+        private val colorSuccess = AriesThemeNightModeSync.resolveColor(context, R.color.m3t_success)
+        private val colorSuccessContainer = AriesThemeNightModeSync.resolveColor(context, R.color.m3t_dialog_surface_alt)
+        private val colorSurface = AriesThemeNightModeSync.resolveColor(context, R.color.m3t_surface)
+        private val colorOnSurface = AriesThemeNightModeSync.resolveColor(context, R.color.m3t_on_surface)
 
         private val trackPaint =
                 Paint(Paint.ANTI_ALIAS_FLAG).apply {

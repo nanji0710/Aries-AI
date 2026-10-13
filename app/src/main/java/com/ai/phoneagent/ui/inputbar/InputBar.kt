@@ -37,6 +37,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.ai.phoneagent.core.designsystem.R as DesignR
+import com.ai.phoneagent.core.designsystem.theme.LocalAriesGlassBackdrop
+import com.ai.phoneagent.core.designsystem.theme.ariesGlassBorder
+import com.ai.phoneagent.core.designsystem.theme.ariesGlassSurface
+import com.ai.phoneagent.core.designsystem.theme.rememberAriesGlassBackdropBlur
+import com.ai.phoneagent.core.designsystem.theme.rememberAriesGlassColors
 import kotlin.math.abs
 import kotlin.random.Random
 
@@ -92,8 +98,16 @@ fun InputBar(
     var imeWasVisible by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val isComposerExpanded = wantsExpandedComposer || isTextFieldFocused
-    val containerColor = colorScheme.surfaceContainerHigh
-    val actionContainerColor = colorScheme.surfaceContainerHighest
+    // 液态玻璃：输入栏与其中的操作按钮改用半透明玻璃底 + 发丝描边，
+    // 让 AriesGlassCanvas 的渐变画布透上来（参考 jicun GlassPanel / LootArchive drawBackdrop 的 onDrawSurface）。
+    // 输入栏下面是滚动正文（HomeScreen 的 transcriptPaneContent），过去必须用高不透明档防叠影；
+    // 现在有了真模糊的背景采样层（采样层里正文已经糊掉），可以降到 bar 档做出玻璃感。
+    val glassColors = rememberAriesGlassColors()
+    val glassBorderWidth = dimensionResource(DesignR.dimen.m3t_glass_border_width)
+    val glassBackdrop = LocalAriesGlassBackdrop.current
+    val glassBlurRadius = rememberAriesGlassBackdropBlur()
+    val containerColor = glassColors.bar
+    val actionContainerColor = glassColors.bar
     val collapsedDisplayText =
         when {
             hasText -> text.replace("\n", " ").trim()
@@ -202,7 +216,13 @@ fun InputBar(
                     Surface(
                         modifier = Modifier
                             .weight(1f)
-                            .height(containerHeight),
+                            .height(containerHeight)
+                            .ariesGlassSurface(
+                                backdrop = glassBackdrop,
+                                shape = inputShape,
+                                blurRadius = glassBlurRadius,
+                            )
+                            .ariesGlassBorder(shape = inputShape, color = glassColors.border, width = glassBorderWidth),
                         shape = inputShape,
                         color = containerColor,
                     ) {
@@ -455,7 +475,13 @@ fun InputBar(
                                             targetScale = 0.99f,
                                             animationSpec = tween(durationMillis = 140, easing = LinearOutSlowInEasing),
                                         ),
-                                    ),
+                                    )
+                                    .ariesGlassSurface(
+                                        backdrop = glassBackdrop,
+                                        shape = inputShape,
+                                        blurRadius = glassBlurRadius,
+                                    )
+                                    .ariesGlassBorder(shape = inputShape, color = glassColors.border, width = glassBorderWidth),
                                 shape = inputShape,
                                 color = containerColor,
                             ) {

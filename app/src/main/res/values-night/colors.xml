@@ -2,12 +2,12 @@
 <resources>
     <color name="blue_glass_primary">@color/m3t_primary</color>
     <color name="blue_glass_primary_variant">@color/m3t_primary_container</color>
-    <color name="blue_glass_primary_dark">#7FB4FF</color>
-    <color name="blue_glass_primary_light">#CFE2FF</color>
+    <color name="blue_glass_primary_dark">#79B8FF</color>
+    <color name="blue_glass_primary_light">#D2E8FF</color>
 
-    <color name="teal_accent">#80CBC4</color>
-    <color name="purple_accent">#CFC0F9</color>
-    <color name="orange_accent">#FFB95E</color>
+    <color name="teal_accent">#98C6F2</color>
+    <color name="purple_accent">#8CA3D5</color>
+    <color name="orange_accent">#E7A85F</color>
 
     <color name="success">@color/m3t_success</color>
     <color name="success_light">#1D3A23</color>

@@ -8,6 +8,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,7 +46,7 @@ import androidx.compose.ui.unit.Dp
 import com.ai.phoneagent.R
 import com.ai.phoneagent.core.designsystem.theme.AriesMaterialTheme
 import com.ai.phoneagent.core.designsystem.theme.AriesSettingsCustomItem
-import com.ai.phoneagent.core.designsystem.theme.AriesSettingsSectionHeader
+import com.ai.phoneagent.core.designsystem.theme.AriesSettingsSection
 import com.ai.phoneagent.core.designsystem.theme.AriesSettingsSwitchItem
 import com.ai.phoneagent.core.designsystem.theme.previewColors
 import com.ai.phoneagent.data.preferences.ThemeColorStyle
@@ -54,6 +55,8 @@ import com.ai.phoneagent.viewmodel.AppearanceViewModel
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide
 import org.koin.androidx.compose.koinViewModel
+import com.ai.phoneagent.core.designsystem.R as DesignR
+import com.ai.phoneagent.core.designsystem.theme.ariesColorResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,7 +120,7 @@ fun AppearanceScreenContent(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(text = stringResource(R.string.settings_appearance_title)) },
@@ -131,7 +134,7 @@ fun AppearanceScreenContent(
                 },
                 colors =
                     TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
+                        containerColor = ariesColorResource(DesignR.color.m3t_glass_bar),
                     ),
                 modifier = Modifier.statusBarsPadding(),
             )
@@ -143,15 +146,26 @@ fun AppearanceScreenContent(
                     .fillMaxSize()
                     .padding(innerPadding)
                     .navigationBarsPadding(),
+            contentPadding =
+                PaddingValues(
+                    start = dimensionResource(R.dimen.m3t_spacing_lg),
+                    end = dimensionResource(R.dimen.m3t_spacing_lg),
+                    top = dimensionResource(R.dimen.m3t_spacing_sm),
+                    bottom = dimensionResource(R.dimen.m3t_spacing_xl),
+                ),
+            verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.m3t_spacing_lg)),
         ) {
+            // Salt 模块化布局：分组标题 + 玻璃分组卡，组内行用 AriesSettings* 组件声明。
             item {
-                AriesSettingsSectionHeader(title = stringResource(R.string.settings_appearance_theme_mode))
-            }
-            
-            item {
-                AriesSettingsCustomItem(
-                    headlineText = stringResource(R.string.settings_appearance_theme_mode),
-                    belowContent = {
+                AriesSettingsSection(title = stringResource(R.string.settings_appearance_theme_mode)) {
+                    Column(
+                        modifier =
+                            Modifier
+                                .padding(
+                                    horizontal = dimensionResource(R.dimen.m3t_spacing_lg),
+                                    vertical = dimensionResource(R.dimen.m3t_spacing_md),
+                                ),
+                    ) {
                         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                             val options = listOf(
                                 ThemeMode.SYSTEM to stringResource(R.string.settings_appearance_theme_system),
@@ -169,27 +183,32 @@ fun AppearanceScreenContent(
                             }
                         }
                     }
-                )
+
+                    AriesSettingsSwitchItem(
+                        headlineText = stringResource(R.string.settings_appearance_amoled),
+                        checked = amoledDarkEnabled,
+                        onCheckedChange = onAmoledDarkEnabledChange,
+                        enabled = isDarkThemeActive,
+                    )
+                }
             }
 
             item {
-                AriesSettingsSwitchItem(
-                    headlineText = stringResource(R.string.settings_appearance_amoled),
-                    checked = amoledDarkEnabled,
-                    onCheckedChange = onAmoledDarkEnabledChange,
-                    enabled = isDarkThemeActive,
-                )
-            }
+                AriesSettingsSection(title = stringResource(R.string.settings_appearance_theme_palette)) {
+                    Column(
+                        modifier =
+                            Modifier
+                                .padding(
+                                    horizontal = dimensionResource(R.dimen.m3t_spacing_lg),
+                                    vertical = dimensionResource(R.dimen.m3t_spacing_md),
+                                ),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.settings_appearance_theme_palette_summary),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
 
-            item {
-                AriesSettingsSectionHeader(title = stringResource(R.string.settings_appearance_theme_palette))
-            }
-
-            item {
-                AriesSettingsCustomItem(
-                    headlineText = stringResource(R.string.settings_appearance_theme_palette),
-                    supportingText = stringResource(R.string.settings_appearance_theme_palette_summary),
-                    belowContent = {
                         val options = buildList {
                             add(ThemeColorStyle.DEFAULT to stringResource(R.string.settings_appearance_theme_palette_default))
                             add(ThemeColorStyle.OCEAN to stringResource(R.string.settings_appearance_theme_palette_ocean))
@@ -201,121 +220,121 @@ fun AppearanceScreenContent(
                             }
                         }
 
-                        Column {
-                            options.forEach { (colorStyle, label) ->
-                                ThemeColorStyleOptionRow(
-                                    colorStyle = colorStyle,
-                                    label = label,
-                                    supportingText =
-                                        if (colorStyle == ThemeColorStyle.DYNAMIC) {
-                                            stringResource(R.string.settings_appearance_theme_palette_dynamic_description)
-                                        } else {
-                                            null
-                                        },
-                                    selected = themeColorStyle == colorStyle,
-                                    darkPreview = isDarkThemeActive,
-                                    onClick = { onThemeColorStyleChange(colorStyle) },
-                                )
-                            }
-                        }
-                    },
-                )
-            }
-
-            item {
-                AriesSettingsSectionHeader(title = stringResource(R.string.settings_appearance_font_size))
-            }
-
-            item {
-                AriesSettingsCustomItem(
-                    headlineText = stringResource(R.string.settings_appearance_font_size),
-                    supportingText = "${chatFontScale}×",
-                    belowContent = {
-                        Column {
-                            Slider(
-                                value = chatFontScale,
-                                onValueChange = onChatFontScaleChange,
-                                valueRange = 0.8f..1.4f,
-                                steps = 2, // 3 intervals: 0.8, 1.0, 1.2, 1.4
-                                modifier = Modifier.fillMaxWidth()
+                        options.forEach { (colorStyle, label) ->
+                            ThemeColorStyleOptionRow(
+                                colorStyle = colorStyle,
+                                label = label,
+                                supportingText =
+                                    if (colorStyle == ThemeColorStyle.DYNAMIC) {
+                                        stringResource(R.string.settings_appearance_theme_palette_dynamic_description)
+                                    } else {
+                                        null
+                                    },
+                                selected = themeColorStyle == colorStyle,
+                                darkPreview = isDarkThemeActive,
+                                onClick = { onThemeColorStyleChange(colorStyle) },
                             )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(stringResource(R.string.settings_appearance_font_size_small), style = MaterialTheme.typography.bodySmall)
-                                Text(stringResource(R.string.settings_appearance_font_size_default), style = MaterialTheme.typography.bodySmall)
-                                Text(stringResource(R.string.settings_appearance_font_size_large), style = MaterialTheme.typography.bodySmall)
-                                Text(stringResource(R.string.settings_appearance_font_size_xlarge), style = MaterialTheme.typography.bodySmall)
-                            }
                         }
                     }
-                )
+                }
             }
 
             item {
-                AriesSettingsCustomItem(
-                    headlineText = stringResource(R.string.settings_appearance_font_family),
-                    belowContent = {
+                AriesSettingsSection(title = stringResource(R.string.settings_appearance_font_size)) {
+                    Column(
+                        modifier =
+                            Modifier
+                                .padding(
+                                    horizontal = dimensionResource(R.dimen.m3t_spacing_lg),
+                                    vertical = dimensionResource(R.dimen.m3t_spacing_md),
+                                ),
+                    ) {
+                        Text(
+                            text = "${chatFontScale}×",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Slider(
+                            value = chatFontScale,
+                            onValueChange = onChatFontScaleChange,
+                            valueRange = 0.8f..1.4f,
+                            steps = 2, // 3 intervals: 0.8, 1.0, 1.2, 1.4
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(stringResource(R.string.settings_appearance_font_size_small), style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(R.string.settings_appearance_font_size_default), style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(R.string.settings_appearance_font_size_large), style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(R.string.settings_appearance_font_size_xlarge), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+
+            item {
+                AriesSettingsSection(title = stringResource(R.string.settings_appearance_font_family)) {
+                    Column(
+                        modifier =
+                            Modifier
+                                .padding(
+                                    horizontal = dimensionResource(R.dimen.m3t_spacing_lg),
+                                    vertical = dimensionResource(R.dimen.m3t_spacing_sm),
+                                ),
+                    ) {
                         val fontOptions = listOf(
                             "default" to stringResource(R.string.settings_appearance_font_default),
                             "sans_serif" to stringResource(R.string.settings_appearance_font_sans_serif),
                             "serif" to stringResource(R.string.settings_appearance_font_serif),
                             "monospace" to stringResource(R.string.settings_appearance_font_monospace)
                         )
-                        
-                        Column {
-                            fontOptions.forEach { (id, label) ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { onChatFontFamilyChange(id) }
-                                        .padding(vertical = dimensionResource(R.dimen.m3t_spacing_sm)),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    RadioButton(
-                                        selected = chatFontFamily == id,
-                                        onClick = { onChatFontFamilyChange(id) }
-                                    )
-                                    Spacer(modifier = Modifier.width(dimensionResource(R.dimen.m3t_spacing_md)))
-                                    Text(
-                                        text = label,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
+
+                        fontOptions.forEach { (id, label) ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onChatFontFamilyChange(id) }
+                                    .padding(vertical = dimensionResource(R.dimen.m3t_spacing_sm)),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = chatFontFamily == id,
+                                    onClick = { onChatFontFamilyChange(id) }
+                                )
+                                Spacer(modifier = Modifier.width(dimensionResource(R.dimen.m3t_spacing_md)))
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
                             }
                         }
                     }
-                )
+                }
             }
 
             item {
-                AriesSettingsSectionHeader(title = stringResource(R.string.settings_appearance_code_section))
-            }
+                AriesSettingsSection(title = stringResource(R.string.settings_appearance_code_section)) {
+                    AriesSettingsSwitchItem(
+                        headlineText = stringResource(R.string.settings_appearance_code_auto_wrap),
+                        checked = codeAutoWrap,
+                        onCheckedChange = onCodeAutoWrapChange,
+                    )
 
-            item {
-                AriesSettingsSwitchItem(
-                    headlineText = stringResource(R.string.settings_appearance_code_auto_wrap),
-                    checked = codeAutoWrap,
-                    onCheckedChange = onCodeAutoWrapChange,
-                )
-            }
-            
-            item {
-                AriesSettingsSwitchItem(
-                    headlineText = stringResource(R.string.settings_appearance_code_line_numbers),
-                    checked = codeLineNumbers,
-                    onCheckedChange = onCodeLineNumbersChange,
-                )
-            }
-            
-            item {
-                AriesSettingsSwitchItem(
-                    headlineText = stringResource(R.string.settings_appearance_code_auto_collapse),
-                    checked = codeAutoCollapse,
-                    onCheckedChange = onCodeAutoCollapseChange,
-                )
+                    AriesSettingsSwitchItem(
+                        headlineText = stringResource(R.string.settings_appearance_code_line_numbers),
+                        checked = codeLineNumbers,
+                        onCheckedChange = onCodeLineNumbersChange,
+                    )
+
+                    AriesSettingsSwitchItem(
+                        headlineText = stringResource(R.string.settings_appearance_code_auto_collapse),
+                        checked = codeAutoCollapse,
+                        onCheckedChange = onCodeAutoCollapseChange,
+                    )
+                }
             }
         }
     }

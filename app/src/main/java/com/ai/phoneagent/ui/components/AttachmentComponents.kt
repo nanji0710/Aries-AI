@@ -41,7 +41,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +51,7 @@ import com.ai.phoneagent.helper.AttachmentManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
+import com.ai.phoneagent.core.designsystem.theme.ariesColorResource
 
 /**
  * 附件选择器面板 - 千问风格底部弹出
@@ -158,7 +158,7 @@ fun AttachmentSelectorPanel(
         ModalBottomSheet(
             onDismissRequest = onDismiss,
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
             dragHandle = {
                 // 千问风格拖动手柄
@@ -177,7 +177,8 @@ fun AttachmentSelectorPanel(
                     )
                 }
             },
-            scrimColor = Color.Transparent
+            // 之前是 Color.Transparent：面板与背后正文之间没有层次，文字互相干扰。
+            scrimColor = Color.Black.copy(alpha = 0.48f)
         ) {
             Column(
                 modifier = Modifier
@@ -216,7 +217,7 @@ fun AttachmentPreviewList(
     modifier: Modifier = Modifier
 ) {
     if (attachments.isEmpty()) return
-    val titleColor = colorResource(id = com.ai.phoneagent.R.color.m3t_attachment_preview_title)
+    val titleColor = ariesColorResource(com.ai.phoneagent.R.color.m3t_attachment_preview_title)
     
     Column(modifier = modifier) {
         Text(
@@ -254,11 +255,11 @@ private fun AttachmentPreviewItem(
     onRemove: () -> Unit,
     onInsert: () -> Unit
 ) {
-    val previewCardBg = colorResource(id = com.ai.phoneagent.R.color.m3t_attachment_preview_card_bg)
-    val previewCardStroke = colorResource(id = com.ai.phoneagent.R.color.m3t_attachment_preview_card_stroke)
-    val previewIconColor = colorResource(id = com.ai.phoneagent.R.color.m3t_attachment_preview_icon)
-    val previewNameColor = colorResource(id = com.ai.phoneagent.R.color.m3t_attachment_preview_name)
-    val previewSizeColor = colorResource(id = com.ai.phoneagent.R.color.m3t_attachment_preview_size)
+    val previewCardBg = ariesColorResource(com.ai.phoneagent.R.color.m3t_attachment_preview_card_bg)
+    val previewCardStroke = ariesColorResource(com.ai.phoneagent.R.color.m3t_attachment_preview_card_stroke)
+    val previewIconColor = ariesColorResource(com.ai.phoneagent.R.color.m3t_attachment_preview_icon)
+    val previewNameColor = ariesColorResource(com.ai.phoneagent.R.color.m3t_attachment_preview_name)
+    val previewSizeColor = ariesColorResource(com.ai.phoneagent.R.color.m3t_attachment_preview_size)
     val icon = when {
         attachment.fileName.startsWith("camera_") -> Lucide.Camera
         attachment.mimeType.startsWith("image/") -> Lucide.Image
@@ -340,9 +341,9 @@ private fun AttachmentOptionItem(
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
-    val optionBgColor = colorResource(id = com.ai.phoneagent.R.color.m3t_attachment_option_bg)
-    val optionIconColor = colorResource(id = com.ai.phoneagent.R.color.m3t_attachment_option_icon)
-    val optionTextColor = colorResource(id = com.ai.phoneagent.R.color.m3t_attachment_option_text)
+    val optionBgColor = ariesColorResource(com.ai.phoneagent.R.color.m3t_attachment_option_bg)
+    val optionIconColor = ariesColorResource(com.ai.phoneagent.R.color.m3t_attachment_option_icon)
+    val optionTextColor = ariesColorResource(com.ai.phoneagent.R.color.m3t_attachment_option_text)
     
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,

@@ -18,10 +18,12 @@ import com.ai.phoneagent.net.AriesApiClient
 import com.ai.phoneagent.net.AriesOidcAuthManager
 import com.ai.phoneagent.net.AutoGlmClient
 import com.ai.phoneagent.net.ModelScopeModelDownloader
+import com.ai.phoneagent.speech.SherpaModelRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.flowOn
 
 class SettingsViewModel(
     application: Application,
@@ -51,6 +53,7 @@ class SettingsViewModel(
     private var apiCheckSeq: Int = 0
     private var lastCheckedApiKey: String = ""
     private var qwenDownloadInFlight: Boolean = false
+    private var speechDownloadInFlight: Boolean = false
     private var apiInputTag: String = ""
     private var apiModePersistJob: Job? = null
 
@@ -96,6 +99,19 @@ class SettingsViewModel(
     var qwenButtonEnabled by mutableStateOf(true)
         private set
 
+    // ─── 离线语音模型（sherpa-ncnn，已移出 APK，需首次下载） ────
+    var speechModelReady by mutableStateOf(false)
+        private set
+
+    var speechButtonText by mutableStateOf("")
+        private set
+
+    var speechButtonEnabled by mutableStateOf(true)
+        private set
+
+    var speechDownloadProgressText by mutableStateOf<String?>(null)
+        private set
+
     // ─── Aries API 区段可见性（隐藏特性，需连点 xuanyu.xyla 20 次解锁） ────
     var showAriesApiSection by mutableStateOf(false)
         private set
@@ -115,6 +131,14 @@ class SettingsViewModel(
     var ariesAvailableModels by mutableStateOf<List<AriesApiClient.ModelInfo>>(emptyList())
         private set
 
+    /** 正在拉取模型列表；用于在对话框内显示加载态，避免「点了没反应」。 */
+    var ariesModelLoading by mutableStateOf(false)
+        private set
+
+    /** 模型列表拉取失败原因 / 未登录提示；null 表示当前无错误。 */
+    var ariesModelError by mutableStateOf<String?>(null)
+        private set
+
     // ─── 登录对话框状态 ──────────────────────────────────────────────────────
     var showAriesLoginDialog by mutableStateOf(false)
         private set
@@ -131,9 +155,44 @@ class SettingsViewModel(
     var ariesLoginError by mutableStateOf<String?>(null)
         private set
 
+    /**
+     * [AppPreferencesRepository.activeAriesApiKeyFlow] 的本地缓存。
+     *
+     * 原先 [updateStatusText] 每次调用都在调用线程上执行 `runBlocking` + AndroidKeyStore 解密，
+     * 而它会被 Compose 点击回调（更换模型、切换模式）直接调用，是「有概率卡死/点不动」的主因之一。
+     */
+    private var activeAriesApiKey: String = ""
+
+    /** 已保存的通用 API Key 缓存，避免 [resolveApiKeyFromInput] 在主线程做 runBlocking 读取。 */
+    private var cachedApiKey: String = ""
+
     init {
-        localModelReady = modelScopeModelDownloader.isQwen35ModelReady(getApplication())
+        // 外部存储 stat（getExternalFilesDir + 多次 exists/length）不放在构造函数主线程里执行
+        viewModelScope.launch {
+            localModelReady =
+                withContext(Dispatchers.IO) {
+                    modelScopeModelDownloader.isQwen35ModelReady(getApplication())
+                }
+            updateQwenDownloadButtonState()
+            updateStatusText()
+        }
+        // 离线语音模型（已移出 APK）的就绪状态同样不能在构造线程上做磁盘 stat
+        viewModelScope.launch {
+            speechModelReady =
+                withContext(Dispatchers.IO) {
+                    SherpaModelRepository.isModelReady(getApplication())
+                }
+            updateSpeechDownloadButtonState()
+        }
         restoreSettings()
+        // 响应式缓存当前生效的 Aries API Key（含 KeyStore 解密，全程在 IO 上）
+        viewModelScope.launch {
+            // flowOn 把上游（含 KeyStore 解密）推到 IO，collect 回调仍在主线程更新状态
+            prefs.activeAriesApiKeyFlow.flowOn(Dispatchers.IO).collect { key ->
+                activeAriesApiKey = key
+                if (useAriesApi) updateStatusText()
+            }
+        }
         // 响应式监听隐藏模型入口解锁状态（AboutViewModel 切换后实时生效）
         viewModelScope.launch {
             prefs.ariesApiSectionUnlockedFlow.collect { unlocked ->
@@ -163,45 +222,90 @@ class SettingsViewModel(
         }
     }
 
+    /**
+     * 恢复设置页状态。
+     *
+     * 原实现在调用线程（= `init` 期间的主线程）上做约 12 次 `*Blocking()` DataStore 读，
+     * 其中 [AppPreferencesRepository.getApiKeyBlocking] 还会触发 AndroidKeyStore 解密，
+     * 是「打开设置页 / 点更换模型时有概率卡住」的主要来源。
+     * 现在改为先在 IO 上读一份快照，再回主线程写入 Compose 状态。
+     */
     fun restoreSettings() {
-        val saved = prefs.getApiKeyBlocking()
+        viewModelScope.launch {
+            val snapshot = withContext(Dispatchers.IO) { readSettingsSnapshot() }
+            applySettingsSnapshot(snapshot)
+        }
+    }
+
+    private class SettingsSnapshot(
+        val savedApiKey: String,
+        val useThirdParty: Boolean,
+        val useLocal: Boolean,
+        val useAries: Boolean,
+        val ariesSectionUnlocked: Boolean,
+        val ariesLoggedInUser: String,
+        val ariesSelectedModel: String,
+        val apiBaseUrl: String,
+        val apiModel: String,
+        val lastCheckSig: String,
+        val hasLastCheckOk: Boolean,
+        val lastCheckOk: Boolean,
+    )
+
+    private suspend fun readSettingsSnapshot(): SettingsSnapshot {
+        val hasLastCheckOk = prefs.hasApiLastCheckOk()
+        return SettingsSnapshot(
+            savedApiKey = prefs.getApiKey(),
+            useThirdParty = prefs.getApiUseThirdParty(),
+            useLocal = prefs.getApiUseLocalModel(),
+            useAries = prefs.getUseAriesApi(),
+            ariesSectionUnlocked = prefs.getAriesApiSectionUnlocked(),
+            ariesLoggedInUser = prefs.getAriesLoggedInUser(),
+            ariesSelectedModel = prefs.getAriesSelectedModel(),
+            apiBaseUrl = prefs.getApiThirdPartyBaseUrl(),
+            apiModel = prefs.getApiThirdPartyModel(),
+            lastCheckSig = prefs.getApiLastCheckSig(),
+            hasLastCheckOk = hasLastCheckOk,
+            lastCheckOk = if (hasLastCheckOk) prefs.getApiLastCheckOk() else false,
+        )
+    }
+
+    private fun applySettingsSnapshot(snapshot: SettingsSnapshot) {
+        val saved = snapshot.savedApiKey
+        cachedApiKey = saved
         apiInputTag = saved
         apiInputText = maskKey(saved)
-        val restoredThirdParty = prefs.getApiUseThirdPartyBlocking()
-        val restoredLocal = prefs.getApiUseLocalModelBlocking()
-        val restoredAries = prefs.getUseAriesApiBlocking()
-        showAriesApiSection = prefs.getAriesApiSectionUnlockedBlocking()
+        showAriesApiSection = snapshot.ariesSectionUnlocked
         val restoredMode =
             resolveApiMode(
-                useThirdParty = restoredThirdParty,
-                useLocal = restoredLocal && showAriesApiSection,
-                useAries = restoredAries && showAriesApiSection,
+                useThirdParty = snapshot.useThirdParty,
+                useLocal = snapshot.useLocal && snapshot.ariesSectionUnlocked,
+                useAries = snapshot.useAries && snapshot.ariesSectionUnlocked,
             )
         applyApiModeState(restoredMode)
-        ariesLoggedInUser = prefs.getAriesLoggedInUserBlocking()
-        ariesSelectedModel = prefs.getAriesSelectedModelBlocking()
-        apiBaseUrlText = prefs.getApiThirdPartyBaseUrlBlocking().ifBlank { AutoGlmClient.DEFAULT_BASE_URL }
-        apiModelText = prefs.getApiThirdPartyModelBlocking().ifBlank { AutoGlmClient.DEFAULT_MODEL }
+        ariesLoggedInUser = snapshot.ariesLoggedInUser
+        ariesSelectedModel = snapshot.ariesSelectedModel
+        apiBaseUrlText = snapshot.apiBaseUrl.ifBlank { AutoGlmClient.DEFAULT_BASE_URL }
+        apiModelText = snapshot.apiModel.ifBlank { AutoGlmClient.DEFAULT_MODEL }
         normalizePersistedApiModeIfNeeded(
-            restoredThirdParty = restoredThirdParty,
-            restoredLocal = restoredLocal,
-            restoredAries = restoredAries,
+            restoredThirdParty = snapshot.useThirdParty,
+            restoredLocal = snapshot.useLocal,
+            restoredAries = snapshot.useAries,
         )
 
-        val lastSig = prefs.getApiLastCheckSigBlocking()
         val currentSig =
             apiConfigSignature(
                 apiKey = saved,
                 baseUrl = resolveApiBaseUrl(),
                 model = resolveApiModel(),
             )
-        if (saved.isNotBlank() && prefs.hasApiLastCheckOkBlocking() && lastSig == currentSig) {
-            remoteApiOk = prefs.getApiLastCheckOkBlocking()
+        if (saved.isNotBlank() && snapshot.hasLastCheckOk && snapshot.lastCheckSig == currentSig) {
+            remoteApiOk = snapshot.lastCheckOk
             remoteApiChecking = false
             lastCheckedApiKey = saved
             apiStatusText =
                 stringRes(
-                    if (remoteApiOk == true) {
+                    if (snapshot.lastCheckOk) {
                         R.string.settings_api_available
                     } else {
                         R.string.settings_api_failed
@@ -218,9 +322,14 @@ class SettingsViewModel(
     }
 
     fun refreshLocalModelState() {
-        localModelReady = modelScopeModelDownloader.isQwen35ModelReady(getApplication())
-        updateQwenDownloadButtonState()
-        updateStatusText()
+        viewModelScope.launch {
+            localModelReady =
+                withContext(Dispatchers.IO) {
+                    modelScopeModelDownloader.isQwen35ModelReady(getApplication())
+                }
+            updateQwenDownloadButtonState()
+            updateStatusText()
+        }
     }
 
     fun openModelApiPage() {
@@ -244,9 +353,14 @@ class SettingsViewModel(
     }
 
     fun onApiModeChange(mode: ApiMode, onToast: (String) -> Unit) {
-        if (apiModePersistJob?.isActive == true) return
+        // 注意：这里不能再用 `apiModePersistJob?.isActive` 做守卫。
+        // persistApiMode 自身已经会 cancel 上一个写入任务，而旧守卫会在上一次写入尚未落盘时
+        // 直接 return，连 applyApiModeState 都不执行 —— 表现为「点了模式没有任何反应」，且是否命中取决于时序。
         if (mode == currentApiMode) return
-        if (!showAriesApiSection && (mode == ApiMode.Local || mode == ApiMode.Aries)) return
+        if (!showAriesApiSection && (mode == ApiMode.Local || mode == ApiMode.Aries)) {
+            onToast(stringRes(R.string.settings_model_api_aries_login_required))
+            return
+        }
         applyApiModeState(mode)
         apiCheckSeq++
         remoteApiOk = null
@@ -346,36 +460,59 @@ class SettingsViewModel(
 
     fun checkApiConnection(onToast: (String) -> Unit) {
         if (useLocalModel) {
-            localModelReady = modelScopeModelDownloader.isQwen35ModelReady(getApplication())
-            updateQwenDownloadButtonState()
-            apiStatusPositive = localModelReady
-            apiStatusText =
-                stringRes(
-                    if (localModelReady) {
-                        R.string.m3t_sidebar_local_model_ready
-                    } else {
-                        R.string.m3t_sidebar_local_model_not_ready
-                    },
-                )
-            if (!localModelReady) {
-                onToast(stringRes(R.string.m3t_sidebar_local_model_not_ready))
+            // 本地模型就绪判定要读外部存储（多次 exists/length），必须在 IO 上做：
+            // 本函数由「验证连接」按钮的 Compose 点击回调（主线程）直接调用。
+            viewModelScope.launch {
+                val ready =
+                    withContext(Dispatchers.IO) {
+                        modelScopeModelDownloader.isQwen35ModelReady(getApplication())
+                    }
+                localModelReady = ready
+                updateQwenDownloadButtonState()
+                apiStatusPositive = ready
+                apiStatusText =
+                    stringRes(
+                        if (ready) {
+                            R.string.m3t_sidebar_local_model_ready
+                        } else {
+                            R.string.m3t_sidebar_local_model_not_ready
+                        },
+                    )
+                if (!ready) {
+                    onToast(stringRes(R.string.m3t_sidebar_local_model_not_ready))
+                }
             }
             return
         }
 
         if (useAriesApi) {
-            val key = prefs.getActiveAriesApiKeyBlocking().trim()
-            if (key.isBlank()) {
-                onToast(stringRes(R.string.settings_model_api_aries_login_required))
+            val cached = activeAriesApiKey.trim()
+            if (cached.isNotBlank()) {
+                startApiCheck(
+                    key = cached,
+                    baseUrl = AriesApiClient.ARIES_API_V1_BASE_URL,
+                    model = ariesSelectedModel.ifBlank { AutoGlmClient.DEFAULT_MODEL },
+                    force = true,
+                    onToast = onToast,
+                )
                 return
             }
-            startApiCheck(
-                key = key,
-                baseUrl = AriesApiClient.ARIES_API_V1_BASE_URL,
-                model = ariesSelectedModel.ifBlank { AutoGlmClient.DEFAULT_MODEL },
-                force = true,
-                onToast = onToast,
-            )
+            // 缓存尚未就绪时再走一次异步读取，避免在主线程 runBlocking（KeyStore 解密）
+            viewModelScope.launch {
+                val key = withContext(Dispatchers.IO) { prefs.getActiveAriesApiKey() }.trim()
+                if (key.isBlank()) {
+                    onToast(stringRes(R.string.settings_model_api_aries_login_required))
+                    return@launch
+                }
+                activeAriesApiKey = key
+                startApiCheck(
+                    key = key,
+                    baseUrl = AriesApiClient.ARIES_API_V1_BASE_URL,
+                    model = ariesSelectedModel.ifBlank { AutoGlmClient.DEFAULT_MODEL },
+                    force = true,
+                    onToast = onToast,
+                )
+            }
             return
         }
 
@@ -386,6 +523,7 @@ class SettingsViewModel(
         }
 
         viewModelScope.launch { prefs.setApiKey(key) }
+        cachedApiKey = key
         apiInputTag = key
         apiInputText = maskKey(key)
         val baseUrl = resolveRemoteApiBaseUrl()
@@ -398,38 +536,140 @@ class SettingsViewModel(
         qwenDownloadInFlight = true
         updateQwenDownloadButtonState()
         viewModelScope.launch {
-            val result = modelScopeModelDownloader.enqueueQwen35Downloads(getApplication())
-            qwenDownloadInFlight = false
-            result.onSuccess {
-                localModelReady = modelScopeModelDownloader.isQwen35ModelReady(getApplication())
-                updateQwenDownloadButtonState()
-                val message =
-                    when {
-                        it.enqueuedCount > 0 ->
-                            stringRes(
-                                R.string.m3t_sidebar_qwen_download_summary_format,
-                                it.enqueuedCount,
-                                it.skippedCount,
-                                it.targetDir,
-                            )
-                        it.skippedCount > 0 -> stringRes(R.string.m3t_sidebar_qwen_download_cached)
-                        else -> stringRes(R.string.m3t_sidebar_qwen_download_enqueued)
+            try {
+                val result = modelScopeModelDownloader.enqueueQwen35Downloads(getApplication())
+                result
+                    .onSuccess {
+                        localModelReady =
+                            withContext(Dispatchers.IO) {
+                                modelScopeModelDownloader.isQwen35ModelReady(getApplication())
+                            }
+                        val message =
+                            when {
+                                it.enqueuedCount > 0 ->
+                                    stringRes(
+                                        R.string.m3t_sidebar_qwen_download_summary_format,
+                                        it.enqueuedCount,
+                                        it.skippedCount,
+                                        it.targetDir,
+                                    )
+                                it.skippedCount > 0 -> stringRes(R.string.m3t_sidebar_qwen_download_cached)
+                                else -> stringRes(R.string.m3t_sidebar_qwen_download_enqueued)
+                            }
+                        onToast(message)
                     }
-                onToast(message)
-                updateStatusText()
-            }.onFailure { err ->
+                    .onFailure { err ->
+                        onToast(
+                            stringRes(
+                                R.string.m3t_sidebar_qwen_download_failed_format,
+                                err.message?.trim().orEmpty().ifBlank {
+                                    stringRes(R.string.update_download_failed_unknown)
+                                },
+                            ),
+                        )
+                    }
+            } finally {
+                // 无论成功、失败还是协程被取消都要复位，否则按钮会永久停留在
+                // 「正在准备下载…」的禁用态，用户观感同样是「点不动」。
+                qwenDownloadInFlight = false
                 updateQwenDownloadButtonState()
-                onToast(
-                    stringRes(
-                        R.string.m3t_sidebar_qwen_download_failed_format,
-                        err.message?.trim().orEmpty().ifBlank {
-                            stringRes(R.string.update_download_failed_unknown)
-                        },
-                    ),
-                )
+                updateStatusText()
             }
         }
     }
+
+    /** 刷新离线语音模型（sherpa-ncnn，已移出 APK）的就绪状态与按钮文案。 */
+    fun refreshSpeechModelState() {
+        viewModelScope.launch {
+            speechModelReady =
+                    withContext(Dispatchers.IO) {
+                        SherpaModelRepository.isModelReady(getApplication())
+                    }
+            updateSpeechDownloadButtonState()
+        }
+    }
+
+    /**
+     * 下载离线语音模型（约 135 MB）。模型不再随安装包分发，首次使用前需下载到 filesDir；
+     * 下载完成后 [SherpaSpeechRecognizer] 的 ensureModelDirReady 会直接命中已存在的目录。
+     */
+    fun enqueueSpeechModelDownload(onToast: (String) -> Unit) {
+        if (speechDownloadInFlight) return
+        speechDownloadInFlight = true
+        speechDownloadProgressText = stringRes(R.string.speech_download_preparing)
+        updateSpeechDownloadButtonState()
+        viewModelScope.launch {
+            try {
+                var lastPercent = -1
+                val result =
+                        SherpaModelRepository.downloadIfNeeded(getApplication()) { downloaded, total ->
+                            if (total <= 0L) return@downloadIfNeeded
+                            val percent = ((downloaded * 100) / total).toInt()
+                            if (percent == lastPercent) return@downloadIfNeeded
+                            lastPercent = percent
+                            val text =
+                                    stringRes(
+                                            R.string.speech_download_progress_format,
+                                            formatBytes(downloaded),
+                                            formatBytes(total),
+                                    )
+                            viewModelScope.launch {
+                                speechDownloadProgressText = text
+                                speechButtonText = text
+                            }
+                        }
+                result
+                        .onSuccess {
+                            speechModelReady = true
+                            onToast(stringRes(R.string.speech_download_complete))
+                        }
+                        .onFailure { err ->
+                            onToast(
+                                    stringRes(
+                                            R.string.speech_download_failed_format,
+                                            err.message?.trim().orEmpty().ifBlank {
+                                                stringRes(R.string.update_download_failed_unknown)
+                                            },
+                                    ),
+                            )
+                        }
+            } finally {
+                speechDownloadInFlight = false
+                speechDownloadProgressText = null
+                speechModelReady =
+                        withContext(Dispatchers.IO) {
+                            SherpaModelRepository.isModelReady(getApplication())
+                        }
+                updateSpeechDownloadButtonState()
+                updateStatusText()
+            }
+        }
+    }
+
+    private fun updateSpeechDownloadButtonState() {
+        speechButtonEnabled = !speechDownloadInFlight
+        speechButtonText =
+                when {
+                    speechDownloadInFlight ->
+                            speechDownloadProgressText ?: stringRes(R.string.speech_download_preparing)
+                    speechModelReady -> stringRes(R.string.speech_download_ready)
+                    else -> stringRes(R.string.speech_download)
+                }
+    }
+
+    private fun formatBytes(bytes: Long): String =
+            when {
+                bytes >= 1024L * 1024L * 1024L ->
+                        String.format(
+                                java.util.Locale.US,
+                                "%.1f GB",
+                                bytes / 1024.0 / 1024.0 / 1024.0,
+                        )
+                bytes >= 1024L * 1024L ->
+                        String.format(java.util.Locale.US, "%.0f MB", bytes / 1024.0 / 1024.0)
+                bytes >= 1024L -> String.format(java.util.Locale.US, "%.0f KB", bytes / 1024.0)
+                else -> "$bytes B"
+            }
 
     fun startApiCheck(
         key: String,
@@ -513,7 +753,9 @@ class SettingsViewModel(
 
     fun updateStatusText() {
         if (useAriesApi) {
-            val hasAriesKey = prefs.getActiveAriesApiKeyBlocking().isNotBlank()
+            // 读缓存而不是 prefs.getActiveAriesApiKeyBlocking()：后者会在调用线程上做
+            // AndroidKeyStore 解密，而本方法会被 Compose 点击回调直接调用。
+            val hasAriesKey = activeAriesApiKey.isNotBlank()
             apiStatusPositive = remoteApiOk == true || (remoteApiOk == null && hasAriesKey)
             if (!remoteApiChecking) {
                 apiStatusText =
@@ -545,7 +787,7 @@ class SettingsViewModel(
     fun resolveApiKeyFromInput(): String {
         val displayed = apiInputText
         val tagKey = apiInputTag.trim()
-        val savedKey = prefs.getApiKeyBlocking().trim()
+        val savedKey = cachedApiKey.trim()
         return when {
             tagKey.isNotBlank() && displayed == maskKey(tagKey) -> tagKey
             savedKey.isNotBlank() && displayed == maskKey(savedKey) -> savedKey
@@ -663,6 +905,9 @@ class SettingsViewModel(
     }
 
     fun submitAriesSsoLogin(activity: Activity, onSuccess: (String) -> Unit, onError: (String) -> Unit) {
+        // 防重入：第二次点击会覆盖 AriesApiOAuthActivity.pendingSession，
+        // 使第一次登录的协程永久挂起（ariesLoginLoading 也就再也不会复位）。
+        if (ariesLoginLoading) return
         ariesLoginLoading = true
         ariesLoginError = null
         viewModelScope.launch {
@@ -716,35 +961,66 @@ class SettingsViewModel(
 
     // ─── Aries 模型选择 ────────────────────────────────────────────────
 
-    private fun fetchAndShowModels(apiKey: String) {
+    /**
+     * 打开 Aries 模型选择对话框。
+     *
+     * 关键点（修复「添加模型时卡死/点了没反应」）：
+     * 1. 不在调用线程（Compose 点击回调 = 主线程）做 `getActiveAriesApiKeyBlocking()`，
+     *    该调用包含 AndroidKeyStore 解密，会直接卡住一帧甚至更久；
+     * 2. 立即打开对话框展示加载态，避免网络慢时界面毫无反馈；
+     * 3. 失败/列表为空时给出可见错误与重试入口，而不是静默 return。
+     */
+    fun openAriesModelSelectionDialog(onToast: (String) -> Unit = {}) {
+        if (ariesAvailableModels.isNotEmpty()) {
+            ariesModelError = null
+            showAriesModelDialog = true
+            return
+        }
+        if (ariesModelLoading) return
+        ariesModelLoading = true
+        ariesModelError = null
+        showAriesModelDialog = true
         viewModelScope.launch {
-            val modelsResult = withContext(Dispatchers.IO) {
-                ariesApiClient.fetchModels(apiKey)
+            val key = withContext(Dispatchers.IO) { prefs.getActiveAriesApiKey() }.trim()
+            if (key.isBlank()) {
+                ariesModelLoading = false
+                val message = stringRes(R.string.settings_model_api_aries_login_required)
+                ariesModelError = message
+                onToast(message)
+                return@launch
             }
-            modelsResult.onSuccess { models ->
-                ariesAvailableModels = models
-                if (models.isNotEmpty()) showAriesModelDialog = true
-            }
+            val result = withContext(Dispatchers.IO) { ariesApiClient.fetchModels(key) }
+            ariesModelLoading = false
+            result
+                .onSuccess { models ->
+                    ariesAvailableModels = models
+                    if (models.isEmpty()) {
+                        val message = stringRes(R.string.aries_model_list_empty)
+                        ariesModelError = message
+                        onToast(message)
+                    } else {
+                        ariesModelError = null
+                    }
+                }
+                .onFailure { err ->
+                    val message =
+                        err.message?.trim()?.takeIf { it.isNotBlank() }
+                            ?: stringRes(R.string.aries_model_list_failed)
+                    ariesModelError = message
+                    onToast(message)
+                }
         }
     }
 
-    fun openAriesModelSelectionDialog() {
-        val key = prefs.getActiveAriesApiKeyBlocking().trim()
-        if (ariesAvailableModels.isEmpty() && key.isNotBlank()) {
-            viewModelScope.launch {
-                val result = withContext(Dispatchers.IO) { ariesApiClient.fetchModels(key) }
-                result.onSuccess { models ->
-                    ariesAvailableModels = models
-                    if (models.isNotEmpty()) showAriesModelDialog = true
-                }
-            }
-        } else if (ariesAvailableModels.isNotEmpty()) {
-            showAriesModelDialog = true
-        }
+    fun retryAriesModelSelection(onToast: (String) -> Unit = {}) {
+        ariesAvailableModels = emptyList()
+        ariesModelError = null
+        openAriesModelSelectionDialog(onToast)
     }
 
     fun dismissAriesModelDialog() {
         showAriesModelDialog = false
+        ariesModelError = null
     }
 
     fun selectAriesModel(modelId: String) {

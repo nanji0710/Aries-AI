@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- M3T Light Palette -->
-    <color name="m3t_primary">#005AC1</color>
+    <!-- M3T Light Palette — airy blue-gray foundation with cobalt accents -->
+    <color name="m3t_primary">#1257C9</color>
     <color name="m3t_on_primary">#FFFFFF</color>
-    <color name="m3t_primary_container">#D7E5FF</color>
-    <color name="m3t_on_primary_container">#001B3F</color>
+    <color name="m3t_primary_container">#DCEBFF</color>
+    <color name="m3t_on_primary_container">#0A2A47</color>
 
-    <color name="m3t_secondary">#3A5F85</color>
+    <color name="m3t_secondary">#577BBA</color>
     <color name="m3t_on_secondary">#FFFFFF</color>
-    <color name="m3t_secondary_container">#D9E8FF</color>
-    <color name="m3t_on_secondary_container">#081D36</color>
+    <color name="m3t_secondary_container">#E8F2FF</color>
+    <color name="m3t_on_secondary_container">#0F2E4D</color>
 
-    <color name="m3t_tertiary">#65558F</color>
+    <color name="m3t_tertiary">#5B6C9A</color>
     <color name="m3t_on_tertiary">#FFFFFF</color>
 
     <color name="m3t_error">#BA1A1A</color>
@@ -20,16 +20,16 @@
     <color name="m3t_error_container">#FFDAD6</color>
     <color name="m3t_on_error_container">#410002</color>
 
-    <color name="m3t_background">#F5FAFF</color>
-    <color name="m3t_on_background">#171C22</color>
+    <color name="m3t_background">#F2F6FB</color>
+    <color name="m3t_on_background">#1B2430</color>
     <color name="m3t_surface">#FFFFFF</color>
-    <color name="m3t_on_surface">#171C22</color>
-    <color name="m3t_surface_container">#E8F1FF</color>
-    <color name="m3t_surface_container_high">#E2EEFF</color>
-    <color name="m3t_surface_variant">#DCE7F5</color>
-    <color name="m3t_on_surface_variant">#2E3D51</color>
-    <color name="m3t_outline">#5E7188</color>
-    <color name="m3t_outline_variant">#A9BBCF</color>
+    <color name="m3t_on_surface">#1B2430</color>
+    <color name="m3t_surface_container">#EEF3F9</color>
+    <color name="m3t_surface_container_high">#E5EDF7</color>
+    <color name="m3t_surface_variant">#EAF0F7</color>
+    <color name="m3t_on_surface_variant">#526174</color>
+    <color name="m3t_outline">#718198</color>
+    <color name="m3t_outline_variant">#C8D3E0</color>
 
     <color name="m3t_inverse_surface">#2C3138</color>
     <color name="m3t_inverse_on_surface">#EFF1F7</color>
@@ -37,38 +37,41 @@
     <color name="m3t_success">#2E7D32</color>
     <color name="m3t_warning">#B56A00</color>
 
-    <color name="m3t_thinking_bg">#DBE8FF</color>
-    <color name="m3t_thinking_text">#1E3551</color>
-    <color name="m3t_thinking_stroke">#6E89AE</color>
+    <color name="m3t_thinking_bg">#EAF2FF</color>
+    <color name="m3t_thinking_text">#1B3A5C</color>
+    <color name="m3t_thinking_stroke">#8FAFD0</color>
 
-    <color name="m3t_message_ai_bg">#E5EFFF</color>
-    <color name="m3t_message_user_bg">#D8E7FF</color>
-    <color name="m3t_message_ai_border">#C3D4EA</color>
-    <color name="m3t_message_user_border">#91B2DC</color>
-    <color name="m3t_message_meta_bg">#F1F6FF</color>
-    <color name="m3t_message_meta_text">#435E7D</color>
-    <color name="m3t_message_action">#203D5E</color>
+    <color name="m3t_message_ai_bg">#FFFFFF</color>
+    <color name="m3t_message_user_bg">#DCEBFF</color>
+    <color name="m3t_message_ai_border">#D7E5F5</color>
+    <color name="m3t_message_user_border">#A8C8EE</color>
+    <color name="m3t_message_meta_bg">#F7FAFF</color>
+    <color name="m3t_message_meta_text">#4A6484</color>
+    <color name="m3t_message_action">#1B3A5C</color>
     <color name="m3t_message_action_stroke">#2A000000</color>
 
-    <color name="m3t_drawer_background">#EAF3FF</color>
-    <color name="m3t_drawer_section_bg">#F1F7FF</color>
-    <color name="m3t_drawer_input_bg">#DFEAF8</color>
-    <color name="m3t_drawer_footer_bg">#E2EEFF</color>
-    <color name="m3t_drawer_active_item_bg">#D8E7FF</color>
-    <color name="m3t_drawer_scrim">#520E1621</color>
+    <color name="m3t_drawer_background">#F2F6FB</color>
+    <color name="m3t_drawer_section_bg">#FFFFFF</color>
+    <color name="m3t_drawer_input_bg">#EAF0F7</color>
+    <color name="m3t_drawer_footer_bg">#EAF1F9</color>
+    <!-- 抽屉选中项：淡蓝底（配合选中标题用 primary） -->
+    <color name="m3t_drawer_active_item_bg">#DCEBFF</color>
+    <!-- 抽屉遮罩：原 32% 太浅，抽屉底改为高不透明玻璃后仍需要足够压暗下层正文，避免两侧文字互相干扰。 -->
+    <color name="m3t_drawer_scrim">#9E0E1621</color>
     <color name="m3t_floating_header">#3D4D66</color>
+    <color name="m3t_on_floating_header">#F2F7FF</color>
     <color name="m3t_floating_surface">#F1F7FF</color>
-    <color name="m3t_floating_text_secondary">#5D7088</color>
+    <color name="m3t_floating_text_secondary">#3F4E63</color>
     <color name="m3t_recommend_grad_start">#262A60AB</color>
     <color name="m3t_recommend_grad_end">#263B82F6</color>
-    <color name="m3t_dialog_surface">#E4F2FF</color>
-    <color name="m3t_dialog_surface_alt">#E2F4E6</color>
+    <color name="m3t_dialog_surface">#FFFFFF</color>
+    <color name="m3t_dialog_surface_alt">#EAF1F9</color>
     <color name="m3t_button_white">#FFFFFF</color>
-    <color name="m3t_button_light_blue">#B3D9FF</color>
-    <color name="m3t_about_page_bg">#F2F8FF</color>
-    <color name="m3t_automation_page_bg">#F6FAFF</color>
-    <color name="m3t_about_card_bg">#E6F0FF</color>
-    <color name="m3t_automation_card_bg">#DCEBFF</color>
+    <color name="m3t_button_light_blue">#C9E2FF</color>
+    <color name="m3t_about_page_bg">#EDF4FB</color>
+    <color name="m3t_automation_page_bg">#EDF4FB</color>
+    <color name="m3t_about_card_bg">#FFFFFF</color>
+    <color name="m3t_automation_card_bg">#FFFFFF</color>
     <color name="m3t_virtual_welcome_bg">#FF000000</color>
     <color name="m3t_virtual_welcome_text">#FFFFFFFF</color>
     <color name="m3t_automation_progress_bg">#E8F5E9</color>
@@ -149,6 +152,7 @@
     <dimen name="m3t_dialog_card_margin_h">20dp</dimen>
     <dimen name="m3t_dialog_padding">20dp</dimen>
     <dimen name="m3t_drawer_width">296dp</dimen>
+    <dimen name="m3t_drawer_max_width">420dp</dimen>
     <dimen name="m3t_about_item_height">52dp</dimen>
     <dimen name="m3t_about_icon_card_size">80dp</dimen>
     <dimen name="m3t_about_row_icon_size">22dp</dimen>
@@ -166,6 +170,7 @@
     <dimen name="m3t_drawer_header_action_size">40dp</dimen>
     <dimen name="m3t_drawer_input_min_height">42dp</dimen>
     <dimen name="m3t_drawer_api_field_height">48dp</dimen>
+    <dimen name="m3t_model_list_height">320dp</dimen>
     <dimen name="m3t_drawer_label_start">4dp</dimen>
     <dimen name="m3t_drawer_search_height">56dp</dimen>
     <dimen name="m3t_drawer_footer_height">72dp</dimen>

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -35,7 +36,6 @@ import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.RotateCw
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.OutlinedButton
@@ -58,38 +58,25 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import com.ai.phoneagent.R
+import com.ai.phoneagent.core.designsystem.R as DesignR
+import com.ai.phoneagent.core.designsystem.theme.AriesGlassCanvas
+import com.ai.phoneagent.core.designsystem.theme.AriesGlassPanel
 import com.ai.phoneagent.core.designsystem.theme.AriesMaterialTheme
+import com.ai.phoneagent.core.designsystem.theme.AriesSettingsOptionCard
 import com.ai.phoneagent.core.designsystem.theme.ThemeMode
+import com.ai.phoneagent.core.designsystem.theme.rememberAriesGlassColors
 import com.ai.phoneagent.ui.components.InfoTooltip
 import com.ai.phoneagent.viewmodel.SettingsViewModel
-
-private enum class SettingsEntryType {
-    Appearance,
-    ModelApi,
-    Automation,
-    About,
-}
-
-private data class SettingsEntryUi(
-    val type: SettingsEntryType,
-    val title: String,
-    val subtitle: String,
-    val icon: ImageVector,
-)
-
-private data class SettingsSectionUi(
-    val title: String,
-    val entries: List<SettingsEntryUi>,
-)
+import com.ai.phoneagent.core.designsystem.theme.ariesColorResource
 
 private data class ApiModeOptionUi(
     val mode: SettingsViewModel.ApiMode,
@@ -105,309 +92,78 @@ fun DrawerSettingsScreen(
     onOpenAppearance: () -> Unit,
     onOpenModelApi: () -> Unit,
     onOpenAutomation: () -> Unit,
-    onOpenAbout: () -> Unit,
 ) {
-    val spacingSm = dimensionResource(R.dimen.m3t_spacing_sm)
     val spacingLg = dimensionResource(R.dimen.m3t_spacing_lg)
     val spacingXl = dimensionResource(R.dimen.m3t_spacing_xl)
-    var searchQuery by rememberSaveable { mutableStateOf("") }
 
-    val entries =
-        listOf(
-            SettingsEntryUi(
-                type = SettingsEntryType.Appearance,
-                title = stringResource(R.string.settings_entry_appearance_title),
-                subtitle = stringResource(R.string.settings_entry_appearance_subtitle),
-                icon = Lucide.Sparkles,
-            ),
-            SettingsEntryUi(
-                type = SettingsEntryType.ModelApi,
-                title = stringResource(R.string.settings_entry_model_api_title),
-                subtitle = stringResource(R.string.settings_entry_model_api_subtitle),
-                icon = Lucide.KeyRound,
-            ),
-            SettingsEntryUi(
-                type = SettingsEntryType.Automation,
-                title = stringResource(R.string.settings_entry_automation_title),
-                subtitle = stringResource(R.string.settings_entry_automation_subtitle),
-                icon = Lucide.Cpu,
-            ),
-            SettingsEntryUi(
-                type = SettingsEntryType.About,
-                title = stringResource(R.string.settings_entry_about_title),
-                subtitle = stringResource(R.string.settings_entry_about_subtitle),
-                icon = Lucide.Info,
-            ),
-        )
-
-    val query = searchQuery.trim()
-    val filteredEntries =
-        entries.filter { entry ->
-            query.isBlank() ||
-                entry.title.contains(query, ignoreCase = true) ||
-                entry.subtitle.contains(query, ignoreCase = true)
-        }
-    val sections =
-        listOf(
-            SettingsSectionUi(
-                title = stringResource(R.string.settings_section_appearance),
-                entries = entries.filter { it.type == SettingsEntryType.Appearance },
-            ),
-            SettingsSectionUi(
-                title = stringResource(R.string.settings_section_model_automation),
-                entries = entries.filter {
-                    it.type == SettingsEntryType.ModelApi || it.type == SettingsEntryType.Automation
-                },
-            ),
-            SettingsSectionUi(
-                title = stringResource(R.string.settings_section_about),
-                entries = entries.filter { it.type == SettingsEntryType.About },
-            ),
-        )
-    val openEntry: (SettingsEntryType) -> Unit = { type ->
-        when (type) {
-            SettingsEntryType.Appearance -> onOpenAppearance()
-            SettingsEntryType.ModelApi -> onOpenModelApi()
-            SettingsEntryType.Automation -> onOpenAutomation()
-            SettingsEntryType.About -> onOpenAbout()
-        }
-    }
-
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text(text = stringResource(R.string.settings_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Lucide.ArrowLeft,
-                            contentDescription = stringResource(R.string.about_back),
-                        )
-                    }
-                },
-                colors =
-                    TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                    ),
-                modifier = Modifier.statusBarsPadding(),
-            )
-        },
-    ) { innerPadding ->
-        LazyColumn(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .navigationBarsPadding(),
-            contentPadding = PaddingValues(start = spacingLg, top = spacingSm, end = spacingLg, bottom = spacingXl),
-            verticalArrangement = Arrangement.spacedBy(spacingSm),
-        ) {
-            item {
-                SettingsSearchField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = stringResource(R.string.settings_search_hint),
+    // 液态玻璃：整页铺渐变画布，分组卡 / 顶栏改用半透明玻璃底 + 发丝描边
+    val glassColors = rememberAriesGlassColors()
+    AriesGlassCanvas(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = { Text(text = stringResource(R.string.settings_title)) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Lucide.ArrowLeft,
+                                contentDescription = stringResource(R.string.about_back),
+                            )
+                        }
+                    },
+                    colors =
+                        TopAppBarDefaults.topAppBarColors(
+                            containerColor = glassColors.bar,
+                        ),
+                    modifier = Modifier.statusBarsPadding(),
                 )
-            }
-
-            if (searchQuery.isBlank()) {
-                sections.forEach { section ->
-                    item(key = "section_${section.title}") {
-                        SettingsSectionCard(
-                            title = section.title,
-                            entries = section.entries,
-                            onEntryClick = openEntry,
-                        )
-                    }
-                }
-            } else {
-                item(key = "search_results") {
-                    SettingsSectionCard(
-                        title = stringResource(R.string.settings_search_results),
-                        entries = filteredEntries,
-                        onEntryClick = openEntry,
+            },
+        ) { innerPadding ->
+            // 布局对齐 jicun 的设置页（`lib/pages/settings.dart:45-79` + `lib/ui/glass.dart:601-664`）：
+            // 不再用「分组卡 + 组内多行」，而是**一条设置一张玻璃卡片**（图标块 + 标题 + 副标题 + 箭头），
+            // 卡片之间 12dp、左右留 20dp；页面标题由 topBar 钉在顶部，对应 jicun 的 BoardHeader。
+            LazyColumn(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .navigationBarsPadding()
+                        .imePadding(),
+                contentPadding =
+                    PaddingValues(start = spacingXl, top = spacingLg, end = spacingXl, bottom = spacingXl),
+                verticalArrangement =
+                    Arrangement.spacedBy(dimensionResource(DesignR.dimen.m3t_settings_card_spacing)),
+            ) {
+                item(key = "settings_card_appearance") {
+                    AriesSettingsOptionCard(
+                        icon = Lucide.Sparkles,
+                        title = stringResource(R.string.settings_entry_appearance_title),
+                        supportingText = stringResource(R.string.settings_entry_appearance_subtitle),
+                        onClick = onOpenAppearance,
                     )
                 }
-            }
-
-            if (filteredEntries.isEmpty()) {
-                item {
-                    SettingsEmptySearchState(text = stringResource(R.string.settings_search_empty))
+                item(key = "settings_card_model_api") {
+                    AriesSettingsOptionCard(
+                        icon = Lucide.KeyRound,
+                        title = stringResource(R.string.settings_entry_model_api_title),
+                        supportingText = stringResource(R.string.settings_entry_model_api_subtitle),
+                        onClick = onOpenModelApi,
+                    )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SettingsSearchField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-) {
-    val radiusXl = dimensionResource(R.dimen.m3t_radius_xl)
-    TextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth(),
-        singleLine = true,
-        leadingIcon = {
-            Icon(
-                painter = painterResource(R.drawable.ic_search_24),
-                contentDescription = null,
-            )
-        },
-        placeholder = { Text(text = placeholder) },
-        shape = RoundedCornerShape(radiusXl),
-        colors =
-            TextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                disabledContainerColor = MaterialTheme.colorScheme.surface,
-                focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                disabledIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-            ),
-    )
-}
-
-@Composable
-private fun SettingsSectionCard(
-    title: String,
-    entries: List<SettingsEntryUi>,
-    onEntryClick: (SettingsEntryType) -> Unit,
-) {
-    val spacingXs = dimensionResource(R.dimen.m3t_spacing_xs)
-    val spacingMd = dimensionResource(R.dimen.m3t_spacing_md)
-    val spacingLg = dimensionResource(R.dimen.m3t_spacing_lg)
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface,
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(vertical = spacingMd)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = spacingLg, vertical = spacingXs),
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(spacingXs)) {
-                entries.forEach { entry ->
-                    SettingsEntryRow(
-                        entry = entry,
-                        onClick = { onEntryClick(entry.type) },
+                item(key = "settings_card_automation") {
+                    AriesSettingsOptionCard(
+                        icon = Lucide.Cpu,
+                        title = stringResource(R.string.settings_entry_automation_title),
+                        supportingText = stringResource(R.string.settings_entry_automation_subtitle),
+                        onClick = onOpenAutomation,
                     )
                 }
             }
         }
     }
 }
-
-@Composable
-private fun SettingsEmptySearchState(text: String) {
-    val spacingLg = dimensionResource(R.dimen.m3t_spacing_lg)
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface,
-    ) {
-        Box(
-            modifier = Modifier.fillMaxWidth().padding(spacingLg),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SettingsEntryRow(
-    entry: SettingsEntryUi,
-    onClick: () -> Unit,
-) {
-    val spacingSm = dimensionResource(R.dimen.m3t_spacing_sm)
-    val spacingMd = dimensionResource(R.dimen.m3t_spacing_md)
-    val spacingLg = dimensionResource(R.dimen.m3t_spacing_lg)
-    val iconSize = dimensionResource(R.dimen.m3t_about_row_icon_size)
-    val chevronSize = dimensionResource(R.dimen.m3t_about_chevron_size)
-
-    Surface(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surface,
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = spacingLg, vertical = spacingSm),
-            horizontalArrangement = Arrangement.spacedBy(spacingMd),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = settingsEntryIconContainerColor(entry.type),
-            ) {
-                Icon(
-                    imageVector = entry.icon,
-                    contentDescription = null,
-                    tint = settingsEntryIconContentColor(entry.type),
-                    modifier = Modifier.padding(spacingSm).size(iconSize),
-                )
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.m3t_spacing_xs)),
-            ) {
-                Text(
-                    text = entry.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = entry.subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Icon(
-                imageVector = Lucide.ArrowLeft,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(chevronSize).graphicsLayer { rotationZ = 180f },
-            )
-        }
-    }
-}
-
-@Composable
-private fun settingsEntryIconContainerColor(type: SettingsEntryType): androidx.compose.ui.graphics.Color =
-    when (type) {
-        SettingsEntryType.Appearance -> MaterialTheme.colorScheme.primaryContainer
-        SettingsEntryType.ModelApi -> MaterialTheme.colorScheme.secondaryContainer
-        SettingsEntryType.Automation -> MaterialTheme.colorScheme.surfaceVariant
-        SettingsEntryType.About -> MaterialTheme.colorScheme.surfaceVariant
-    }
-
-@Composable
-private fun settingsEntryIconContentColor(type: SettingsEntryType): androidx.compose.ui.graphics.Color =
-    when (type) {
-        SettingsEntryType.Appearance -> MaterialTheme.colorScheme.onPrimaryContainer
-        SettingsEntryType.ModelApi -> MaterialTheme.colorScheme.onSecondaryContainer
-        SettingsEntryType.Automation -> MaterialTheme.colorScheme.onSurfaceVariant
-        SettingsEntryType.About -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -420,6 +176,9 @@ fun DrawerModelApiConfigScreen(
     apiStatusPositive: Boolean,
     qwenButtonText: String,
     qwenButtonEnabled: Boolean,
+    speechButtonText: String,
+    speechButtonEnabled: Boolean,
+    speechModelReady: Boolean,
     showAriesApiSection: Boolean,
     ariesLoggedInUser: String,
     ariesSelectedModel: String,
@@ -435,6 +194,7 @@ fun DrawerModelApiConfigScreen(
     onApiModelChange: (String) -> Unit,
     onCheckApi: () -> Unit,
     onDownloadQwenModel: () -> Unit,
+    onDownloadSpeechModel: () -> Unit,
 ) {
     val spacingXs = dimensionResource(R.dimen.m3t_spacing_xs)
     val spacingSm = dimensionResource(R.dimen.m3t_spacing_sm)
@@ -504,20 +264,23 @@ fun DrawerModelApiConfigScreen(
     val statusCheckingText = stringResource(R.string.settings_api_checking)
     val statusPillContainerColor =
         when {
-            apiStatusPositive -> colorResource(R.color.success_light)
-            apiStatus.isNotBlank() && apiStatus != statusNotCheckedText && apiStatus != statusCheckingText -> colorResource(R.color.error_light)
+            apiStatusPositive -> ariesColorResource(R.color.success_light)
+            apiStatus.isNotBlank() && apiStatus != statusNotCheckedText && apiStatus != statusCheckingText -> ariesColorResource(R.color.error_light)
             else -> MaterialTheme.colorScheme.surfaceVariant
         }
     val statusPillContentColor =
         when {
-            apiStatusPositive -> colorResource(R.color.success_dark)
-            apiStatus.isNotBlank() && apiStatus != statusNotCheckedText && apiStatus != statusCheckingText -> colorResource(R.color.error_dark)
+            apiStatusPositive -> ariesColorResource(R.color.success_dark)
+            apiStatus.isNotBlank() && apiStatus != statusNotCheckedText && apiStatus != statusCheckingText -> ariesColorResource(R.color.error_dark)
             else -> MaterialTheme.colorScheme.onSurfaceVariant
         }
 
+    // 液态玻璃：整页铺渐变画布，卡片 / 顶栏改用半透明玻璃底 + 发丝描边
+    val glassColors = rememberAriesGlassColors()
+    AriesGlassCanvas(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(text = stringResource(R.string.settings_section_api)) },
@@ -531,7 +294,7 @@ fun DrawerModelApiConfigScreen(
                 },
                 colors =
                     TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
+                        containerColor = glassColors.bar,
                     ),
                 modifier = Modifier.statusBarsPadding(),
             )
@@ -542,7 +305,8 @@ fun DrawerModelApiConfigScreen(
                 Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .navigationBarsPadding(),
+                    .navigationBarsPadding()
+                    .imePadding(),
             contentPadding = PaddingValues(start = spacingLg, top = spacingSm, end = spacingLg, bottom = spacingXl),
             verticalArrangement = Arrangement.spacedBy(spacingSm),
         ) {
@@ -724,6 +488,29 @@ fun DrawerModelApiConfigScreen(
                 }
             }
 
+            // 离线语音模型（sherpa-ncnn，已移出 APK 约 135 MB）：语音输入在所有 API 模式下都可用，
+            // 因此无条件展示这一块，未下载时给出下载入口。
+            item {
+                ModelApiSectionCard {
+                    SectionIntro(
+                        title = stringResource(R.string.settings_model_api_speech_title),
+                        subtitle = stringResource(R.string.settings_model_api_speech_subtitle),
+                    )
+
+                    Spacer(modifier = Modifier.height(spacingMd))
+
+                    FilledTonalButton(
+                        onClick = onDownloadSpeechModel,
+                        enabled = speechButtonEnabled && !speechModelReady,
+                        modifier = Modifier.fillMaxWidth().height(compactButtonHeight),
+                    ) {
+                        Icon(Lucide.Download, contentDescription = null)
+                        Spacer(modifier = Modifier.width(spacingSm))
+                        Text(speechButtonText)
+                    }
+                }
+            }
+
             if (currentApiMode == SettingsViewModel.ApiMode.Aries) {
                 item {
                     ModelApiSectionCard {
@@ -793,6 +580,7 @@ fun DrawerModelApiConfigScreen(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -801,12 +589,15 @@ private fun ModelApiSectionCard(
 ) {
     val spacingMd = dimensionResource(R.dimen.m3t_spacing_md)
     val spacingLg = dimensionResource(R.dimen.m3t_spacing_lg)
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = MaterialTheme.shapes.large,
+    val moduleShape = RoundedCornerShape(dimensionResource(DesignR.dimen.m3t_glass_radius_card))
+    AriesGlassPanel(
+        modifier = Modifier.fillMaxWidth(),
+        shape = moduleShape,
+        elevated = true,
+        contentPadding = PaddingValues(horizontal = spacingLg, vertical = spacingMd),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = spacingLg, vertical = spacingMd),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.Top,
             content = content,
         )
@@ -919,7 +710,8 @@ private fun ModeOptionRow(
     val spacingMd = dimensionResource(R.dimen.m3t_spacing_md)
     Surface(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surface,
+        // 选中行同样透出外层玻璃卡片
+        color = Color.Transparent,
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(spacingMd),
@@ -996,7 +788,6 @@ private fun DrawerSettingsScreenLightPreview() {
             onOpenAppearance = {},
             onOpenModelApi = {},
             onOpenAutomation = {},
-            onOpenAbout = {},
         )
     }
 }
@@ -1010,7 +801,6 @@ private fun DrawerSettingsScreenDarkPreview() {
             onOpenAppearance = {},
             onOpenModelApi = {},
             onOpenAutomation = {},
-            onOpenAbout = {},
         )
     }
 }

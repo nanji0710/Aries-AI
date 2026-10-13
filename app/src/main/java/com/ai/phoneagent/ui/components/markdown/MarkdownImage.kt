@@ -15,7 +15,6 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.forEachGesture
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,6 +53,7 @@ import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import coil3.request.ImageRequest
+import com.ai.phoneagent.core.designsystem.theme.LocalAriesIsDarkTheme
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Download
 import com.composables.icons.lucide.X
@@ -189,7 +189,7 @@ fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
 
 @Composable
 fun ShimmerBox(modifier: Modifier = Modifier) {
-    val isDark  = isSystemInDarkTheme()
+    val isDark  = LocalAriesIsDarkTheme.current
     val base    = if (isDark) Color(0xFF3A3A3A) else Color(0xFFE0E0E0)
     val shimmer = if (isDark) Color(0xFF4A4A4A) else Color(0xFFF5F5F5)
 

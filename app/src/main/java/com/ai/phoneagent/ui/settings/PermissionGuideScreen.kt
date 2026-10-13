@@ -26,8 +26,7 @@ import com.composables.icons.lucide.Layers
 import com.composables.icons.lucide.Mic
 import com.composables.icons.lucide.Smartphone
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import com.ai.phoneagent.core.designsystem.theme.AriesGlassPanel
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,9 +54,12 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavController
+import androidx.compose.ui.graphics.Color
 import com.ai.phoneagent.PermissionSetupSupport
 import com.ai.phoneagent.core.designsystem.R as DesignSystemR
 import com.ai.phoneagent.feature.settings.R
+import com.ai.phoneagent.core.designsystem.R as DesignR
+import com.ai.phoneagent.core.designsystem.theme.ariesColorResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,7 +113,7 @@ fun PermissionGuideScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(text = stringResource(R.string.perm_sheet_title)) },
@@ -124,7 +126,7 @@ fun PermissionGuideScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = ariesColorResource(DesignR.color.m3t_glass_bar),
                 ),
                 modifier = Modifier.statusBarsPadding(),
             )
@@ -218,15 +220,14 @@ private fun PermissionRow(
     val spacingSm = dimensionResource(DesignSystemR.dimen.m3t_spacing_sm)
     val spacingMd = dimensionResource(DesignSystemR.dimen.m3t_spacing_md)
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    AriesGlassPanel(
+        modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        modifier = Modifier.fillMaxWidth()
+        elevated = true,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(spacingMd),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(spacingMd),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(

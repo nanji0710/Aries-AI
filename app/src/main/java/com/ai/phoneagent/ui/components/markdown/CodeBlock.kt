@@ -10,7 +10,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.ai.phoneagent.core.designsystem.theme.LocalAriesIsDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -88,7 +88,7 @@ fun CodeBlock(
     }
 
     val settings     = LocalMarkdownSettings.current
-    val isDark       = isSystemInDarkTheme()
+    val isDark       = LocalAriesIsDarkTheme.current
     val context      = LocalContext.current
     val clipboard    = LocalClipboardManager.current
 

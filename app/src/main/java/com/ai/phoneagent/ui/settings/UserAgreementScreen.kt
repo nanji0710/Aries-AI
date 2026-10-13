@@ -27,6 +27,9 @@ import com.ai.phoneagent.R
 import com.ai.phoneagent.feature.settings.R as SettingsR
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide
+import androidx.compose.ui.graphics.Color
+import com.ai.phoneagent.core.designsystem.R as DesignR
+import com.ai.phoneagent.core.designsystem.theme.ariesColorResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,7 +42,7 @@ fun UserAgreementScreen(navController: NavController) {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(text = stringResource(SettingsR.string.user_agreement_title)) },
@@ -53,7 +56,7 @@ fun UserAgreementScreen(navController: NavController) {
                 },
                 colors =
                     TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
+                        containerColor = ariesColorResource(DesignR.color.m3t_glass_bar),
                     ),
             )
         },

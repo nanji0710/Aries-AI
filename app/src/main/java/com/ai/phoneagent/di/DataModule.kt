@@ -21,7 +21,6 @@ import androidx.room.Room
 import com.ai.phoneagent.data.local.AriesDatabase
 import com.ai.phoneagent.data.preferences.AppPreferencesRepository
 import com.ai.phoneagent.data.preferences.AutomationResultsRepository
-import com.ai.phoneagent.data.preferences.FloatingChatPreferencesRepository
 import com.ai.phoneagent.data.preferences.MainUiPreferencesRepository
 import com.ai.phoneagent.data.preferences.TelemetryPreferencesRepository
 import com.ai.phoneagent.data.preferences.ToolPermissionsRepository
@@ -55,7 +54,6 @@ val dataModule = module {
     single { MainUiPreferencesRepository(androidContext()) }
     single<SecretStore> { AndroidKeyStoreSecretStore() }
     single { AppPreferencesRepository(androidContext(), get()) }
-    single { FloatingChatPreferencesRepository(androidContext()) }
     single { VirtualDisplayConfigRepository(androidContext()) }
     single { ToolPermissionsRepository(androidContext()) }
     single { AutomationResultsRepository(androidContext()) }

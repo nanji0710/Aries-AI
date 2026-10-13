@@ -1,4 +1,4 @@
-﻿package com.ai.phoneagent.core.automation
+package com.ai.phoneagent.core.automation
 
 import android.content.Intent
 import android.util.Log
@@ -37,7 +37,7 @@ class AutomationDispatchAuthenticator {
      * 纯展示字段（[AutomationViewModel.EXTRA_FORCE_TOP_ON_ENTRY] /
      * [AutomationViewModel.EXTRA_KEEP_MAIN_ON_TOP]）仅控制 Activity 进栈与置顶行为，
      * 不携带自动化指令，故移出鉴权范围——内部入口（AutomationOverlay、
-     * AutomationLiveNotification、FloatingChatService.navigateToTaskDetail）可继续附带这些字段而无须 token。
+     * AutomationLiveNotification）可继续附带这些字段而无须 token。
      */
     fun isAuthorized(intent: Intent?): Boolean {
         intent ?: return true
